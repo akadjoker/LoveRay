@@ -1,0 +1,71 @@
+
+
+cpFloat cpGearJointGetPhase(const cpConstraint *constraint);
+void cpGearJointSetPhase(cpConstraint *constraint, cpFloat phase);
+cpFloat cpGearJointGetRatio(const cpConstraint *constraint);
+void cpGearJointSetRatio(cpConstraint *constraint, cpFloat ratio);
+
+
+
+cpVect cpGrooveJointGetGrooveA(const cpConstraint *constraint);
+void cpGrooveJointSetGrooveA(cpConstraint *constraint, cpVect grooveA);
+cpVect cpGrooveJointGetGrooveB(const cpConstraint *constraint);
+void cpGrooveJointSetGrooveB(cpConstraint *constraint, cpVect grooveB);
+cpVect cpGrooveJointGetAnchorB(const cpConstraint *constraint);
+void cpGrooveJointSetAnchorB(cpConstraint *constraint, cpVect anchorB);
+
+
+
+cpVect cpPinJointGetAnchorA(const cpConstraint *constraint);
+void cpPinJointSetAnchorA(cpConstraint *constraint, cpVect anchorA);
+cpVect cpPinJointGetAnchorB(const cpConstraint *constraint);
+void cpPinJointSetAnchorB(cpConstraint *constraint, cpVect anchorB);
+cpFloat cpPinJointGetDist(const cpConstraint *constraint);
+void cpPinJointSetDist(cpConstraint *constraint, cpFloat dist);
+
+
+cpVect cpPivotJointGetAnchorA(const cpConstraint *constraint);
+void cpPivotJointSetAnchorA(cpConstraint *constraint, cpVect anchorA);
+cpVect cpPivotJointGetAnchorB(const cpConstraint *constraint);
+void cpPivotJointSetAnchorB(cpConstraint *constraint, cpVect anchorB);
+
+
+ cpConstraint* cpSimpleMotorNew(cpBody *a, cpBody *b, cpFloat rate);
+
+ cpFloat cpSimpleMotorGetRate(const cpConstraint *constraint);
+/// Set the rate of the motor.
+ void cpSimpleMotorSetRate(cpConstraint *constraint, cpFloat rate);
+
+
+cpConstraint* cpDampedSpringNew(cpBody *a, cpBody *b, cpVect anchorA, cpVect anchorB, cpFloat restLength, cpFloat stiffness, cpFloat damping);
+ cpVect cpDampedSpringGetAnchorA(const cpConstraint *constraint);
+ void cpDampedSpringSetAnchorA(cpConstraint *constraint, cpVect anchorA);
+ cpVect cpDampedSpringGetAnchorB(const cpConstraint *constraint);
+ void cpDampedSpringSetAnchorB(cpConstraint *constraint, cpVect anchorB);
+ cpFloat cpDampedSpringGetRestLength(const cpConstraint *constraint);
+ void cpDampedSpringSetRestLength(cpConstraint *constraint, cpFloat restLength);
+
+ cpFloat cpDampedSpringGetStiffness(const cpConstraint *constraint);
+ void cpDampedSpringSetStiffness(cpConstraint *constraint, cpFloat stiffness);
+ cpFloat cpDampedSpringGetDamping(const cpConstraint *constraint);
+ void cpDampedSpringSetDamping(cpConstraint *constraint, cpFloat damping);
+ cpDampedSpringForceFunc cpDampedSpringGetSpringForceFunc(const cpConstraint *constraint);
+ void cpDampedSpringSetSpringForceFunc(cpConstraint *constraint, cpDampedSpringForceFunc springForceFunc);
+
+
+
+ cpConstraint* cpDampedRotarySpringNew(cpBody *a, cpBody *b, cpFloat restAngle, cpFloat stiffness, cpFloat damping);
+ cpFloat cpDampedRotarySpringGetRestAngle(const cpConstraint *constraint);
+ void cpDampedRotarySpringSetRestAngle(cpConstraint *constraint, cpFloat restAngle);
+
+ cpFloat cpDampedRotarySpringGetStiffness(const cpConstraint *constraint);
+ void cpDampedRotarySpringSetStiffness(cpConstraint *constraint, cpFloat stiffness);
+ cpFloat cpDampedRotarySpringGetDamping(const cpConstraint *constraint);
+ void cpDampedRotarySpringSetDamping(cpConstraint *constraint, cpFloat damping);
+ cpDampedRotarySpringTorqueFunc cpDampedRotarySpringGetSpringTorqueFunc(const cpConstraint *constraint);
+ void cpDampedRotarySpringSetSpringTorqueFunc(cpConstraint *constraint, cpDampedRotarySpringTorqueFunc springTorqueFunc);
+
+/// Perform a directed line segment query (like a raycast) against the space and return the first shape hit. Returns NULL if no shapes were hit.
+cpShape *cpSpaceSegmentQueryFirst(cpSpace *space, cpVect start, cpVect end, cpFloat radius, cpShapeFilter filter, cpSegmentQueryInfo *out);
+cpShape *cpSpacePointQueryNearest(cpSpace *space, cpVect point, cpFloat maxDistance, cpShapeFilter filter, cpPointQueryInfo *out);
+world_get_body_at_point
