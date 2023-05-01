@@ -14,3 +14,5 @@ Features:
 <img src="https://raw.githubusercontent.com/akadjoker/LoveRay/main/001.gif">
 <img src="https://raw.githubusercontent.com/akadjoker/LoveRay/main/002.gif">
 <img src="https://raw.githubusercontent.com/akadjoker/LoveRay/main/003.gif">
+<img src="https://raw.githubusercontent.com/akadjoker/LoveRay/main/004.gif">
+
