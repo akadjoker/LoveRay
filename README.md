@@ -10,3 +10,5 @@ Features:
 - Lua script support for game logic and events
 - Easy to use 
 - Support for audio, keyboard and mouse input, and other common 2D game features
+
+<img src="https://raw.githubusercontent.com/akadjoker/LoveRay/main/001.gif">
