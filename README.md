@@ -195,4 +195,7 @@ newQuad
 newSound
 newFont
 
+PS:
+I don't know if I'm going to update this project because I'm making another version that isn't compatible with Love2d but a framewoek with other types of features that I think are important for game development
+https://djokergames.wordpress.com/news/
 
