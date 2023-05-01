@@ -12,3 +12,5 @@ Features:
 - Support for audio, keyboard and mouse input, and other common 2D game features
 
 <img src="https://raw.githubusercontent.com/akadjoker/LoveRay/main/001.gif">
+<img src="https://raw.githubusercontent.com/akadjoker/LoveRay/main/002.gif">
+<img src="https://raw.githubusercontent.com/akadjoker/LoveRay/main/003.gif">
