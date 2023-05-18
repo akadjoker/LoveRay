@@ -3,10 +3,26 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <lua.hpp>
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
+
+#define Push_int(L, value) lua_pushinteger(L, value)
+#define Push_float(L, value) lua_pushnumber(L, value);
+#define Push_double(L, value) lua_pushnumber(L, value);
+#define Push_bool(L, value) lua_pushboolean(L, value)
+#define Push_string(L, value) lua_pushstring(L, value)
+
+#define Get_ptr (void *)luaL_checkinteger
+#define Get_int (int)luaL_checkinteger
+#define Get_bool (bool)lua_toboolean
+#define Get_unsigned (unsigned)luaL_checkinteger
+#define Get_char (char)luaL_checkinteger
+#define Get_float (float)luaL_checknumber
+#define Get_double luaL_checknumber
+#define Get_string luaL_checkstring
 
 #define CONSOLE_COLOR_RESET "\033[0m"
 #define CONSOLE_COLOR_GREEN "\033[1;32m"
@@ -125,6 +141,12 @@ void CreateLove(lua_State *L);
 #ifdef LOVE_IMPLEMENTATION
 
 #include "Physics.hpp"
+#include <string>
+#include <cstring>
+#include <vector>
+#include <algorithm>
+#include <unordered_map>
+#include <map>
 
 MatrixStack::MatrixStack()
 {
@@ -195,7 +217,7 @@ static bool screenFullscreen = false;
 static bool screenBorderless = false;
 static bool screenResizable = true;
 static bool screenInit = false;
-
+static std::map<std::string, int> _keys;
 namespace nGraphics
 {
 
@@ -1003,47 +1025,72 @@ namespace nImage
 namespace nInput
 {
 
-    int loveKeyToRaylib(const char *key)
+    int coreKeyToRaylib(const char *key)
     {
-        int key_code = 0;
-        if (strcmp(key, "up") == 0)
-            key_code = KEY_UP;
-        else if (strcmp(key, "down") == 0)
-            key_code = KEY_DOWN;
-        else if (strcmp(key, "left") == 0)
-            key_code = KEY_LEFT;
-        else if (strcmp(key, "right") == 0)
-            key_code = KEY_RIGHT;
-        else if (strcmp(key, "space") == 0)
-            key_code = KEY_SPACE;
-        else if (strlen(key) == 1)
-        {                             // check if key is a single character
-            char c = tolower(key[0]); // convert to lowercase
-            if (c >= 'a' && c <= 'z')
-            {
-                key_code = KEY_APOSTROPHE + (c - 'a');
-            }
-            else if (c >= '0' && c <= '9')
-            {
-                key_code = KEY_ZERO + (c - '0');
-            }
+        if (_keys.find(key) == _keys.end())
+        {
+            Log(LOG_WARNING, "Key not found: %s", key);
+            return -1;
         }
+        int key_code = _keys[key];
         return key_code;
     }
 
     static int love_keyboard_isDown(lua_State *L)
     {
-        const char *key = luaL_checkstring(L, 1);
-        int key_code = loveKeyToRaylib(key);
-        lua_pushboolean(L, IsKeyDown(key_code));
+        bool result = false;
+        if (lua_gettop(L) == 1)
+        {
+            const char *key = luaL_checkstring(L, 1);
+
+            int key_code = coreKeyToRaylib(key);
+
+            result = IsKeyDown(key_code);
+        }
+        else if (lua_gettop(L) == 2)
+        {
+            const char *key1 = luaL_checkstring(L, 1);
+            const char *key2 = luaL_checkstring(L, 2);
+            int key_code1 = coreKeyToRaylib(key1);
+            int key_code2 = coreKeyToRaylib(key2);
+            result = IsKeyDown(key_code1) || IsKeyDown(key_code2);
+          
+        }
+        else
+        {
+            luaL_error(L, "Invalid number of arguments, expected 1 or 2");
+        }
+
+        lua_pushboolean(L, result);
+
         return 1;
     }
 
     static int love_keyboard_check(lua_State *L)
     {
-        const char *key = luaL_checkstring(L, 1);
-        int key_code = loveKeyToRaylib(key);
-        lua_pushinteger(L, IsKeyDown(key_code));
+        int result = 0;
+        if (lua_gettop(L) == 1)
+        {
+            const char *key = luaL_checkstring(L, 1);
+
+            int key_code = coreKeyToRaylib(key);
+
+            result = IsKeyDown(key_code);
+        }
+        else if (lua_gettop(L) == 2)
+        {
+            const char *key1 = luaL_checkstring(L, 1);
+            const char *key2 = luaL_checkstring(L, 2);
+            int key_code1 = coreKeyToRaylib(key1);
+            int key_code2 = coreKeyToRaylib(key2);
+            result = (int)IsKeyDown(key_code1) || IsKeyDown(key_code2);
+        }
+        else
+        {
+            luaL_error(L, "Invalid number of arguments, expected 1 or 2");
+        }
+
+        lua_pushinteger(L, result);
         return 1;
     }
 
@@ -1060,43 +1107,200 @@ namespace nInput
 
     static int love_keyboard_down(lua_State *L)
     {
-        const char *key = luaL_checkstring(L, 1);
-        int key_code = loveKeyToRaylib(key);
-        lua_pushboolean(L, IsKeyDown(key_code));
+        bool result = false;
+        if (lua_gettop(L) == 1)
+        {
+            const char *key = luaL_checkstring(L, 1);
+
+            int key_code = coreKeyToRaylib(key);
+
+            result = IsKeyDown(key_code);
+        }
+        else if (lua_gettop(L) == 2)
+        {
+            const char *key1 = luaL_checkstring(L, 1);
+            const char *key2 = luaL_checkstring(L, 2);
+            int key_code1 = coreKeyToRaylib(key1);
+            int key_code2 = coreKeyToRaylib(key2);
+            result = IsKeyDown(key_code1) || IsKeyDown(key_code2);
+        }
+        else
+        {
+            luaL_error(L, "Invalid number of arguments, expected 1 or 2");
+        }
+
+        lua_pushboolean(L, result);
+
         return 1;
     }
     static int love_keyboard_press(lua_State *L)
     {
-        const char *key = luaL_checkstring(L, 1);
-        int key_code = loveKeyToRaylib(key);
-        lua_pushboolean(L, IsKeyPressed(key_code));
+        bool result = false;
+        if (lua_gettop(L) == 1)
+        {
+            const char *key = luaL_checkstring(L, 1);
+
+            int key_code = coreKeyToRaylib(key);
+
+            result = IsKeyPressed(key_code);
+        }
+        else if (lua_gettop(L) == 2)
+        {
+            const char *key1 = luaL_checkstring(L, 1);
+            const char *key2 = luaL_checkstring(L, 2);
+            int key_code1 = coreKeyToRaylib(key1);
+            int key_code2 = coreKeyToRaylib(key2);
+            result = IsKeyPressed(key_code1) || IsKeyPressed(key_code2);
+        }
+        else
+        {
+            luaL_error(L, "Invalid number of arguments, expected 1 or 2");
+        }
+
+        lua_pushboolean(L, result);
+
         return 1;
     }
 
     static int love_keyboard_release(lua_State *L)
     {
-        const char *key = luaL_checkstring(L, 1);
-        int key_code = loveKeyToRaylib(key);
-        lua_pushboolean(L, IsKeyReleased(key_code));
+        bool result = false;
+        if (lua_gettop(L) == 1)
+        {
+            const char *key = luaL_checkstring(L, 1);
+
+            int key_code = coreKeyToRaylib(key);
+
+            result = IsKeyReleased(key_code);
+        }
+        else if (lua_gettop(L) == 2)
+        {
+            const char *key1 = luaL_checkstring(L, 1);
+            const char *key2 = luaL_checkstring(L, 2);
+            int key_code1 = coreKeyToRaylib(key1);
+            int key_code2 = coreKeyToRaylib(key2);
+            result = IsKeyReleased(key_code1) || IsKeyReleased(key_code2);
+        }
+        else
+        {
+            luaL_error(L, "Invalid number of arguments, expected 1 or 2");
+        }
+
+        lua_pushboolean(L, result);
         return 1;
     }
     static int love_keyboard_up(lua_State *L)
     {
-        const char *key = luaL_checkstring(L, 1);
-        int key_code = loveKeyToRaylib(key);
-        lua_pushboolean(L, IsKeyUp(key_code));
+        bool result = false;
+        if (lua_gettop(L) == 1)
+        {
+            const char *key = luaL_checkstring(L, 1);
+
+            int key_code = coreKeyToRaylib(key);
+
+            result = IsKeyReleased(key_code);
+        }
+        else if (lua_gettop(L) == 2)
+        {
+            const char *key1 = luaL_checkstring(L, 1);
+            const char *key2 = luaL_checkstring(L, 2);
+            int key_code1 = coreKeyToRaylib(key1);
+            int key_code2 = coreKeyToRaylib(key2);
+            result = IsKeyUp(key_code1) || IsKeyUp(key_code2);
+        }
+        else
+        {
+            luaL_error(L, "Invalid number of arguments, expected 1 or 2");
+        }
+
+        lua_pushboolean(L, result);
         return 1;
     }
     static int love_keyboard_setExitKey(lua_State *L)
     {
         const char *key = luaL_checkstring(L, 1);
-        int key_code = loveKeyToRaylib(key);
+        int key_code = coreKeyToRaylib(key);
         SetExitKey(key_code);
         return 0;
     }
 
     static int luaopen_keyboard(lua_State *L)
     {
+         _keys["a"] = KEY_A;
+    _keys["b"] = KEY_B;
+    _keys["c"] = KEY_C;
+    _keys["d"] = KEY_D;
+    _keys["e"] = KEY_E;
+    _keys["f"] = KEY_F;
+    _keys["g"] = KEY_G;
+    _keys["h"] = KEY_H;
+    _keys["i"] = KEY_I;
+    _keys["j"] = KEY_J;
+    _keys["k"] = KEY_K;
+    _keys["l"] = KEY_L;
+    _keys["m"] = KEY_M;
+    _keys["n"] = KEY_N;
+    _keys["o"] = KEY_O;
+    _keys["p"] = KEY_P;
+    _keys["q"] = KEY_Q;
+    _keys["r"] = KEY_R;
+    _keys["s"] = KEY_S;
+    _keys["t"] = KEY_T;
+    _keys["u"] = KEY_U;
+    _keys["v"] = KEY_V;
+    _keys["w"] = KEY_W;
+    _keys["x"] = KEY_X;
+    _keys["y"] = KEY_Y;
+    _keys["z"] = KEY_Z;
+    _keys["0"] = KEY_ZERO;
+    _keys["1"] = KEY_ONE;
+    _keys["2"] = KEY_TWO;
+    _keys["3"] = KEY_THREE;
+    _keys["4"] = KEY_FOUR;
+    _keys["5"] = KEY_FIVE;
+    _keys["6"] = KEY_SIX;
+    _keys["7"] = KEY_SEVEN;
+    _keys["8"] = KEY_EIGHT;
+    _keys["9"] = KEY_NINE;
+    _keys["space"] = KEY_SPACE;
+    _keys["esc"] = KEY_ESCAPE;
+    _keys["enter"] = KEY_ENTER;
+    _keys["backspace"] = KEY_BACKSPACE;
+    _keys["tab"] = KEY_TAB;
+    _keys["left"] = KEY_LEFT;
+    _keys["right"] = KEY_RIGHT;
+    _keys["up"] = KEY_UP;
+    _keys["down"] = KEY_DOWN;
+    _keys["f1"] = KEY_F1;
+    _keys["f2"] = KEY_F2;
+    _keys["f3"] = KEY_F3;
+    _keys["f4"] = KEY_F4;
+    _keys["f5"] = KEY_F5;
+    _keys["f6"] = KEY_F6;
+    _keys["f7"] = KEY_F7;
+    _keys["f8"] = KEY_F8;
+    _keys["f9"] = KEY_F9;
+    _keys["f10"] = KEY_F10;
+    _keys["f11"] = KEY_F11;
+    _keys["f12"] = KEY_F12;
+    _keys["pause"] = KEY_PAUSE;
+    _keys["insert"] = KEY_INSERT;
+    _keys["home"] = KEY_HOME;
+    _keys["pageup"] = KEY_PAGE_UP;
+    _keys["pagedown"] = KEY_PAGE_DOWN;
+    _keys["end"] = KEY_END;
+    _keys["del"] = KEY_DELETE;
+    _keys["capslock"] = KEY_CAPS_LOCK;
+    _keys["scrolllock"] = KEY_SCROLL_LOCK;
+    _keys["numlock"] = KEY_NUM_LOCK;
+    _keys["printscreen"] = KEY_PRINT_SCREEN;
+    _keys["rightshift"] = KEY_RIGHT_SHIFT;
+    _keys["leftshift"] = KEY_LEFT_SHIFT;
+    _keys["rightcontrol"] = KEY_RIGHT_CONTROL;
+    _keys["leftcontrol"] = KEY_LEFT_CONTROL;
+    _keys["rightalt"] = KEY_RIGHT_ALT;
+    _keys["leftalt"] = KEY_LEFT_ALT;
+    _keys["rightsuper"] = KEY_RIGHT_SUPER;
         luaL_Reg reg[] = {
             {"isDown", love_keyboard_isDown},
             {"check", love_keyboard_check},
@@ -1317,12 +1521,12 @@ namespace nFileSystem
             Log(LOG_ERROR, "%s\n", error_message);
 
             lua_pushstring(L, error_message);
-            
+
             return 1;
         }
 
-         lua_pushvalue(L, -1);
-     
+        lua_pushvalue(L, -1);
+
         return 1;
     }
 
@@ -1363,8 +1567,7 @@ namespace nFileSystem
             {"getPath", l_filesystem_getfilePath},
             {"read", l_filesystem_read},
             {"load", l_filesystem_load},
-            
-            
+
             {0, 0},
         };
         luaL_newlib(L, reg);
@@ -1562,7 +1765,6 @@ namespace nSound
         return 0;
     }
 
-
     int registerSound(lua_State *L)
     {
 
@@ -1594,163 +1796,146 @@ namespace nSound
         return 0;
     }
 
-
-static int music_is_ready(lua_State *L)
-{
-    Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
-    if (music_ptr == nullptr)
+    static int music_is_playing(lua_State *L)
     {
-        return luaL_error(L, "[isReady] Invalid Music object");
+        Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
+        if (music_ptr == nullptr)
+        {
+            return luaL_error(L, "[isPlaying] Invalid Music object");
+        }
+        Music music = (*music_ptr);
+        bool b = IsMusicStreamPlaying(music);
+        lua_pushboolean(L, b);
+        return 1;
     }
-    Music music = (*music_ptr);
-    bool b = IsMusicReady(music);
-    lua_pushboolean(L, b);
-    return 1;
-}
 
-static int music_is_playing(lua_State *L)
-{
-    Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
-    if (music_ptr == nullptr)
+    static int music_play(lua_State *L)
     {
-        return luaL_error(L, "[isPlaying] Invalid Music object");
+        Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
+        if (music_ptr == nullptr)
+        {
+            return luaL_error(L, "[play] Invalid Music object");
+        }
+        Music music = (*music_ptr);
+        PlayMusicStream(music);
+        return 0;
     }
-    Music music = (*music_ptr);
-    bool b = IsMusicStreamPlaying(music);
-    lua_pushboolean(L, b);
-    return 1;
-}
 
-static int music_play(lua_State *L)
-{
-    Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
-    if (music_ptr == nullptr)
+    static int music_pause(lua_State *L)
     {
-        return luaL_error(L, "[play] Invalid Music object");
+        Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
+        if (music_ptr == nullptr)
+        {
+            return luaL_error(L, "[pause] Invalid Music object");
+        }
+        Music music = (*music_ptr);
+        PauseMusicStream(music);
+        return 0;
     }
-    Music music = (*music_ptr);
-    PlayMusicStream(music);
-    return 0;
-}
 
-static int music_pause(lua_State *L)
-{
-    Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
-    if (music_ptr == nullptr)
+    static int music_stop(lua_State *L)
     {
-        return luaL_error(L, "[pause] Invalid Music object");
+        Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
+        if (music_ptr == nullptr)
+        {
+            return luaL_error(L, "[stop] Invalid Music object");
+        }
+        Music music = (*music_ptr);
+        StopMusicStream(music);
+        return 0;
     }
-    Music music = (*music_ptr);
-    PauseMusicStream(music);
-    return 0;
-}
 
-static int music_stop(lua_State *L)
-{
-    Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
-    if (music_ptr == nullptr)
+    static int music_resume(lua_State *L)
     {
-        return luaL_error(L, "[stop] Invalid Music object");
+        Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
+        if (music_ptr == nullptr)
+        {
+            return luaL_error(L, "[resume] Invalid Music object");
+        }
+        Music music = (*music_ptr);
+        ResumeMusicStream(music);
+        return 0;
     }
-    Music music = (*music_ptr);
-    StopMusicStream(music);
-    return 0;
-}
 
-static int music_resume(lua_State *L)
-{
-    Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
-    if (music_ptr == nullptr)
+    static int music_seek(lua_State *L)
     {
-        return luaL_error(L, "[resume] Invalid Music object");
+        Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
+        float position = luaL_checknumber(L, 2);
+        if (music_ptr == nullptr)
+        {
+            return luaL_error(L, "[seek] Invalid Music object");
+        }
+        Music music = (*music_ptr);
+        SeekMusicStream(music, position);
+        return 0;
     }
-    Music music = (*music_ptr);
-    ResumeMusicStream(music);
-    return 0;
-}
 
-static int music_seek(lua_State *L)
-{
-    Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
-    float position = luaL_checknumber(L, 2);
-    if (music_ptr == nullptr)
+    static int music_set_volume(lua_State *L)
     {
-        return luaL_error(L, "[seek] Invalid Music object");
+        Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
+        float volume = luaL_checknumber(L, 2);
+        if (music_ptr == nullptr)
+        {
+            return luaL_error(L, "[setVolume] Invalid Music object");
+        }
+        Music music = (*music_ptr);
+        SetMusicVolume(music, volume);
+        return 0;
     }
-    Music music = (*music_ptr);
-    SeekMusicStream(music, position);
-    return 0;
-}
 
-static int music_set_volume(lua_State *L)
-{
-    Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
-    float volume = luaL_checknumber(L, 2);
-    if (music_ptr == nullptr)
+    static int music_set_pitch(lua_State *L)
     {
-        return luaL_error(L, "[setVolume] Invalid Music object");
+        Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
+        float pitch = luaL_checknumber(L, 2);
+        if (music_ptr == nullptr)
+        {
+            return luaL_error(L, "[setPitch] Invalid Music object");
+        }
+        Music music = (*music_ptr);
+        SetMusicPitch(music, pitch);
+        return 0;
     }
-    Music music = (*music_ptr);
-    SetMusicVolume(music, volume);
-    return 0;
-}
 
-static int music_set_pitch(lua_State *L)
-{
-    Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
-    float pitch = luaL_checknumber(L, 2);
-    if (music_ptr == nullptr)
+    static int music_set_pan(lua_State *L)
     {
-        return luaL_error(L, "[setPitch] Invalid Music object");
+        Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
+        float pan = luaL_checknumber(L, 2);
+        if (music_ptr == nullptr)
+        {
+            return luaL_error(L, "[setPan] Invalid Music object");
+        }
+        Music music = (*music_ptr);
+        SetMusicPan(music, pan);
+        return 0;
     }
-    Music music = (*music_ptr);
-    SetMusicPitch(music, pitch);
-    return 0;
-}
 
-static int music_set_pan(lua_State *L)
-{
-    Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
-    float pan = luaL_checknumber(L, 2);
-    if (music_ptr == nullptr)
+    static int music_get_time_length(lua_State *L)
     {
-        return luaL_error(L, "[setPan] Invalid Music object");
+        Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
+        if (music_ptr == nullptr)
+        {
+            return luaL_error(L, "[getTimeLength] Invalid Music object");
+        }
+        Music music = (*music_ptr);
+        float time = GetMusicTimeLength(music);
+        lua_pushnumber(L, time);
+        return 1;
     }
-    Music music = (*music_ptr);
-    SetMusicPan(music, pan);
-    return 0;
-}
 
-static int music_get_time_length(lua_State *L)
-{
-    Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
-    if (music_ptr == nullptr)
+    static int music_get_time_played(lua_State *L)
     {
-        return luaL_error(L, "[getTimeLength] Invalid Music object");
+        Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
+        if (music_ptr == nullptr)
+        {
+            return luaL_error(L, "[getTimePlayed] Invalid Music object");
+        }
+        Music music = (*music_ptr);
+        float time = GetMusicTimePlayed(music);
+        lua_pushnumber(L, time);
+        return 1;
     }
-    Music music = (*music_ptr);
-    float time = GetMusicTimeLength(music);
-    lua_pushnumber(L, time);
-    return 1;
-}
 
-static int music_get_time_played(lua_State *L)
-{
-    Music *music_ptr = (Music *)luaL_checkudata(L, 1, "Music");
-    if (music_ptr == nullptr)
-    {
-        return luaL_error(L, "[getTimePlayed] Invalid Music object");
-    }
-    Music music = (*music_ptr);
-    float time = GetMusicTimePlayed(music);
-    lua_pushnumber(L, time);
-    return 1;   
-}
-
-
-
-
- static int newMusic(lua_State *L)
+    static int newMusic(lua_State *L)
     {
         const char *filename = luaL_checkstring(L, 1);
         if (FileExists(filename) == false)
@@ -1781,7 +1966,7 @@ static int music_get_time_played(lua_State *L)
         return 0;
     }
 
-int registerMusic(lua_State *L)
+    int registerMusic(lua_State *L)
     {
 
         luaL_newmetatable(L, "Music");
@@ -1819,7 +2004,6 @@ int registerMusic(lua_State *L)
 
     /// sound function
 
-
     int luaopen_sound(lua_State *L)
     {
         luaL_Reg reg[] = {
@@ -1829,7 +2013,6 @@ int registerMusic(lua_State *L)
             {0, 0},
         };
         luaL_newlib(L, reg);
-
 
         return 1;
     }
@@ -1965,7 +2148,7 @@ int luaopen_graphics(lua_State *L)
         {"circle", love_graphics_circle},
         {"print", love_graphics_print},
         {"newImage", nImage::newImage},
-        {"newQuad", nQuad::newQuad},        
+        {"newQuad", nQuad::newQuad},
         {"newFont", nFont::newFont},
         {0, 0},
     };

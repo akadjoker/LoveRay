@@ -132,7 +132,7 @@ static void
 PairRecycle(cpBBTree *tree, Pair *pair)
 {
 	// Share the pool of the master tree.
-	// TODO: would be lovely to move the pairs stuff into an external data structure.
+	// TODO: would be corely to move the pairs stuff into an external data structure.
 	tree = GetMasterTree(tree);
 	
 	pair->a.next = tree->pooledPairs;
@@ -143,7 +143,7 @@ static Pair *
 PairFromPool(cpBBTree *tree)
 {
 	// Share the pool of the master tree.
-	// TODO: would be lovely to move the pairs stuff into an external data structure.
+	// TODO: would be corely to move the pairs stuff into an external data structure.
 	tree = GetMasterTree(tree);
 	
 	Pair *pair = tree->pooledPairs;
