@@ -115,24 +115,7 @@ struct lQuad
     float sw;
     float sh;
 };
-class MatrixStack
-{
-public:
-    MatrixStack();
 
-    void push();
-    void pop();
-    void rotate(float radians);
-    void translate(float sx, float sy);
-    void scale(float sx, float sy);
-    void shear(float kx, float ky);
-    void applyMatrix(const Matrix &matrix);
-    void applyTransformations() const;
-
-private:
-    std::vector<Matrix> transformationStack;
-    Matrix currentTransformation;
-};
 
 void CloseLove(lua_State *L);
 void CreateLove(lua_State *L);
@@ -148,66 +131,24 @@ void CreateLove(lua_State *L);
 #include <unordered_map>
 #include <map>
 
-MatrixStack::MatrixStack()
-{
-    currentTransformation = MatrixIdentity();
-}
 
-void MatrixStack::push()
-{
-    transformationStack.push_back(currentTransformation);
-}
 
-void MatrixStack::pop()
-{
+// void MatrixStack::shear(float kx, float ky)
+// {
+//     Matrix shearMatrix = {
+//         1, kx, 0, 0,
+//         ky, 1, 0, 0,
+//         0, 0, 1, 0,
+//         0, 0, 0, 1};
 
-    if (!transformationStack.empty())
-    {
-        currentTransformation = transformationStack.back();
-        transformationStack.pop_back();
-    }
-    rlPopMatrix();
-}
+//     currentTransformation = MatrixMultiply(currentTransformation, shearMatrix);
+// }
 
-void MatrixStack::rotate(float radians)
-{
-    currentTransformation = MatrixMultiply(currentTransformation, MatrixRotateZ(radians));
-}
 
-void MatrixStack::scale(float sx, float sy)
-{
-    currentTransformation = MatrixMultiply(currentTransformation, MatrixScale(sx, sy, 1.0f));
-}
-
-void MatrixStack::translate(float sx, float sy)
-{
-    currentTransformation = MatrixMultiply(currentTransformation, MatrixTranslate(sx, sy, 0.0f));
-}
-
-void MatrixStack::shear(float kx, float ky)
-{
-    Matrix shearMatrix = {
-        1, kx, 0, 0,
-        ky, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1};
-
-    currentTransformation = MatrixMultiply(currentTransformation, shearMatrix);
-}
-
-void MatrixStack::applyMatrix(const Matrix &matrix)
-{
-    currentTransformation = MatrixMultiply(currentTransformation, matrix);
-}
-void MatrixStack::applyTransformations() const
-{
-    rlPushMatrix();
-    rlMultMatrixf(MatrixToFloat(currentTransformation));
-}
 
 static Color _color;
 static Color _backgroundColor;
-static MatrixStack matrixStack;
+static Camera2D _camera;
 static int screenWidth = 800;
 static int screenHeight = 600;
 static int screenFps = 60;
@@ -244,11 +185,9 @@ namespace nGraphics
         rlCheckRenderBatchLimit(4); // Make sure there is enough free space on the batch buffer
         rlSetTexture(quad->tex.id);
 
-        matrixStack.push();
 
-        matrixStack.applyMatrix(*mat);
-        matrixStack.applyTransformations();
-
+        rlPushMatrix();
+        rlMultMatrixf(MatrixToFloat(*mat));
         rlBegin(RL_QUADS);
 
         Color a = quad->v[1].col;
@@ -275,8 +214,9 @@ namespace nGraphics
         rlVertex3f(quad->v[2].x, quad->v[2].y, quad->v[2].z);
 
         rlEnd();
+        rlPopMatrix();
 
-        matrixStack.pop();
+     
     }
 
     void RenderClipFlip(Texture2D texture, int width, int height, Rectangle clip, bool flipX, bool flipY, Color color, const Matrix *matrix, int blend)
@@ -350,6 +290,24 @@ namespace nGraphics
 
         quad.v[0].z = quad.v[1].z = quad.v[2].z = quad.v[3].z = 0.0f;
         quad.v[0].col = quad.v[1].col = quad.v[2].col = quad.v[3].col = color;
+
+
+
+    // rlPushMatrix(); // Salva a matriz de transformação atual
+
+
+    // rlMultMatrixf( MatrixToFloat( cameraMatrix));
+
+
+    // RenderQuadMatrix(&quad, matrix);
+
+
+
+    // rlPopMatrix();
+
+    // rlPushMatrix(); 
+    // RenderQuadMatrix(&quad, matrix);
+    // rlPopMatrix(); // Restaura a matriz de transformação anterior
 
         RenderQuadMatrix(&quad, matrix);
     }
@@ -425,10 +383,9 @@ namespace nGraphics
         {
             size = (int)luaL_checknumber(L, 4);
         }
-        matrixStack.push();
-        matrixStack.applyTransformations();
+  
         DrawText(text, x, y, size, _color);
-        matrixStack.pop();
+
         return 0;
     }
 
@@ -444,8 +401,7 @@ namespace nGraphics
         float y = (float)luaL_checknumber(L, 3);
         float width = (float)luaL_checknumber(L, 4);
         float height = (float)luaL_checknumber(L, 5);
-        matrixStack.push();
-        matrixStack.applyTransformations();
+
         if (strcmp(fill, "fill") == 0)
         {
             DrawRectangle(x, y, width, height, _color);
@@ -454,7 +410,7 @@ namespace nGraphics
         {
             DrawRectangleLines(x, y, width, height, _color);
         }
-        matrixStack.pop();
+
         return 0;
     }
 
@@ -469,8 +425,7 @@ namespace nGraphics
         float x = (float)luaL_checknumber(L, 2);
         float y = (float)luaL_checknumber(L, 3);
         float radius = (float)luaL_checknumber(L, 4);
-        matrixStack.push();
-        matrixStack.applyTransformations();
+
         if (strcmp(fill, "fill") == 0)
         {
             DrawCircle(x, y, radius, _color);
@@ -479,7 +434,7 @@ namespace nGraphics
         {
             DrawCircleLines(x, y, radius, _color);
         }
-        matrixStack.pop();
+ 
         return 0;
     }
 
@@ -494,11 +449,10 @@ namespace nGraphics
         float y1 = (float)luaL_checknumber(L, 2);
         float x2 = (float)luaL_checknumber(L, 3);
         float y2 = (float)luaL_checknumber(L, 4);
-        matrixStack.push();
-        matrixStack.applyTransformations();
+   
 
         DrawLine(x1, y1, x2, y2, _color);
-        matrixStack.pop();
+   
 
         return 0;
     }
@@ -584,6 +538,9 @@ namespace nGraphics
 
                 mat = setTransformation(x, y, angle, sx, sy, ox, oy, kx, ky);
                 RenderClipFlip(image, source.width, source.height, source, false, false, _color, &mat, 0);
+
+
+
 
                 return 0;
             }
@@ -683,20 +640,131 @@ namespace nGraphics
     {
         (void)L;
 
-        rlLoadIdentity();          // Reset current matrix (modelview)
-        rlDrawRenderBatchActive(); // Update and draw internal render batch
-        matrixStack.push();
-        matrixStack.applyTransformations();
+       // rlLoadIdentity();          // Reset current matrix (modelview)
+      //  rlDrawRenderBatchActive(); // Update and draw internal render batch
+      //  matrixStack.push();
+       // matrixStack.applyTransformations();
+     //  cameraMatrix = rlGetMatrixTransform();
+        rlPushMatrix();
 
+
+        return 0;
+    }
+      static int core_graphics_get_camera_offset(lua_State *L)
+    {
+
+        lua_pushnumber(L, _camera.offset.x);
+        lua_pushnumber(L, _camera.offset.y);
+
+        return 2;
+    }
+
+    static int core_graphics_set_camera_offset(lua_State *L)
+    {
+
+        if (lua_gettop(L) < 2)
+        {
+            return luaL_error(L, "set_camera_offet function requires 2 arguments");
+        }
+
+        float x = (float)luaL_checknumber(L, 1);
+        float y = (float)luaL_checknumber(L, 2);
+
+        _camera.offset.x = x;
+        _camera.offset.y = y;
+
+        return 0;
+    }
+    static int core_graphics_get_camera_rotation(lua_State *L)
+    {
+
+        lua_pushnumber(L, _camera.rotation);
+
+        return 1;
+    }
+
+    static int core_graphics_set_camera_rotation(lua_State *L)
+    {
+
+        if (lua_gettop(L) < 1)
+        {
+            return luaL_error(L, "set_camera_rotation function requires 1 arguments");
+        }
+
+        float rotation = (float)luaL_checknumber(L, 1);
+
+        _camera.rotation = rotation;
+
+        return 0;
+    }
+
+    static int core_graphics_get_camera_zoom(lua_State *L)
+    {
+
+        lua_pushnumber(L, _camera.zoom);
+
+        return 1;
+    }
+
+    static int core_graphics_set_camera_zoom(lua_State *L)
+    {
+
+        if (lua_gettop(L) < 1)
+        {
+            return luaL_error(L, "set_camera_zoom function requires 1 arguments");
+        }
+
+        float zoom = (float)luaL_checknumber(L, 1);
+
+        _camera.zoom = zoom;
+
+        return 0;
+    }
+
+    static int core_graphics_set_camera_target(lua_State *L)
+    {
+
+        if (lua_gettop(L) < 2)
+        {
+            return luaL_error(L, "set_camera_target function requires 2 arguments");
+        }
+
+        float x = (float)luaL_checknumber(L, 1);
+        float y = (float)luaL_checknumber(L, 2);
+
+        _camera.target.x = x;
+        _camera.target.y = y;
+
+        return 0;
+    }
+    static int core_graphics_get_camera_target(lua_State *L)
+    {
+
+        lua_pushnumber(L, _camera.target.x);
+        lua_pushnumber(L, _camera.target.y);
+
+        return 2;
+    }
+        static int core_graphics_begin_camera(lua_State *L)
+    {
+        (void)L;
+        BeginMode2D(_camera);
+        return 0;
+    }
+    static int core_graphics_end_camera(lua_State *L)
+    {
+        (void)L;
+        EndMode2D();
         return 0;
     }
 
     static int love_graphics_pop(lua_State *L)
     {
         (void)L;
-        rlDrawRenderBatchActive(); // Update and draw internal render batch
-        rlLoadIdentity();          // Reset current matrix (modelview)
-        matrixStack.pop();
+          rlPopMatrix();
+       // rlDrawRenderBatchActive(); // Update and draw internal render batch
+       // rlLoadIdentity();          // Reset current matrix (modelview)
+       // matrixStack.pop();
         return 0;
     }
 
@@ -709,8 +777,9 @@ namespace nGraphics
 
         float x = (float)luaL_checknumber(L, 1);
         float y = (float)luaL_checknumber(L, 2);
+        rlTranslatef(x, y, 0.0f);
 
-        matrixStack.translate(x, y);
+        //matrixStack.translate(x, y);
         return 0;
     }
 
@@ -722,8 +791,9 @@ namespace nGraphics
         }
 
         float angle = (float)luaL_checknumber(L, 1);
+        rlRotatef(angle, 0.0f, 0.0f, 1.0f);
 
-        matrixStack.rotate(angle);
+        //matrixStack.rotate(angle);
         return 0;
     }
 
@@ -736,8 +806,9 @@ namespace nGraphics
 
         float x = (float)luaL_checknumber(L, 1);
         float y = (float)luaL_checknumber(L, 2);
+        rlScalef(x, y, 1.0f);
 
-        matrixStack.scale(x, y);
+        //matrixStack.scale(x, y);
         return 0;
     }
 
@@ -750,7 +821,7 @@ namespace nGraphics
 
         float x = (float)luaL_checknumber(L, 1);
         float y = (float)luaL_checknumber(L, 2);
-        matrixStack.shear(x, y);
+        //matrixStack.shear(x, y);
 
         return 0;
     }
@@ -1378,10 +1449,34 @@ namespace nInput
         return 1;
     }
 
+        static int core_mouse_getWorldPosition(lua_State *L)
+    {
+        Vector2 pos = GetMousePosition();
+        lua_pushnumber(L, pos.x / _camera.zoom - _camera.offset.x + _camera.target.x);
+        lua_pushnumber(L, pos.y / _camera.zoom - _camera.offset.x + _camera.target.x);
+        return 2;
+    }
+   
+    static int core_mouse_getWorldX(lua_State *L)
+    {
+
+        lua_pushnumber(L, GetMouseX() / _camera.zoom - _camera.offset.x + _camera.target.x);
+        return 1;
+    }
+    static int core_mouse_getWorldY(lua_State *L)
+    {
+
+        lua_pushnumber(L, GetMouseY() / _camera.zoom - _camera.offset.y + _camera.target.y);
+        return 1;
+    }
+
     int luaopen_mouse(lua_State *L)
     {
         luaL_Reg reg[] = {
             {"getPosition", love_mouse_getPosition},
+              {"getWorldPosition", core_mouse_getWorldPosition},
+            {"getWorldX", core_mouse_getWorldX},
+            {"getWorldY", core_mouse_getWorldY},
             {"getX", love_mouse_getX},
             {"getY", love_mouse_getY},
             {"isDown", love_mouse_isDown},
@@ -2131,6 +2226,21 @@ int luaopen_graphics(lua_State *L)
         {"setColor", love_graphics_setColor},
         {"getFont", love_graphics_getFont},
 
+        {"beginCamera", core_graphics_begin_camera},
+        {"endCamera", core_graphics_end_camera},
+
+        {"setCameraOrigin", core_graphics_set_camera_offset},
+        {"getCameraOrigin", core_graphics_get_camera_offset},
+
+        {"setCameraPosition", core_graphics_set_camera_target},
+        {"getCameraPosition", core_graphics_get_camera_target},
+
+        {"setCameraZoom", core_graphics_set_camera_zoom},
+        {"getCameraZoom", core_graphics_get_camera_zoom},
+
+        {"setCameraRotation", core_graphics_set_camera_rotation},
+        {"getCameraRotation", core_graphics_get_camera_rotation},
+
         {"pop", love_graphics_pop},
         {"push", love_graphics_push},
         {"rotate", love_graphics_rotate},
@@ -2205,6 +2315,13 @@ void CreateLove(lua_State *L)
 
     _color = WHITE;
     _backgroundColor = BLACK;
+    _camera.offset.x = 0;
+    _camera.offset.y = 0;
+    _camera.rotation = 0;
+    _camera.zoom = 1.0f;
+    _camera.target.x = 0;
+    _camera.target.y = 0;
+
     //  luaL_dostring(L, "package.path = package.path .. ';scripts/?.lua;assets/scripts/?.lua;assets/scripts/utils/?.lua'");
 
     registerQuad(L);

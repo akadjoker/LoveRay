@@ -43,8 +43,9 @@ love.graphics.setColor(1, 0, 1,1)
 love.graphics.print(" FPS: " .. tostring(love.timer.getFPS()) , 5, 5)
 love.graphics.setColor(1, 1, 1,1)
 
+
 demo:draw()
-love.physics.draw()
+
 
 
 
