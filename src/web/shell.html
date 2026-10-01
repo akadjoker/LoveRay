@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LoveRay</title>
+    <style>
+        html, body { margin: 0; height: 100%; background: #14161f; color: #dde; font: 14px/1.4 system-ui, sans-serif; }
+        body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+        canvas { background: #000; border: 1px solid #333; max-width: 100vw; max-height: 100vh; }
+        canvas:focus { outline: none; }
+        #status { color: #9ab; min-height: 1.4em; }
+        #games a { color: #f9c24a; margin: 0 6px; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+    <div id="status">Loading...</div>
+    <div id="games"></div>
+    <script>
+        var statusEl = document.getElementById('status');
+        var params = new URLSearchParams(window.location.search);
+        var game = params.get('game');
+        var Module = {
+            print: function (text) { console.log(text); },
+            printErr: function (text) { console.warn(text); },
+            canvas: document.getElementById('canvas'),
+            arguments: game ? ['/game/' + game] : [],
+            setStatus: function (text) { if (text) { statusEl.textContent = text; } },
+            onRuntimeInitialized: function () {
+                statusEl.textContent = game ? ('Running ' + game) : 'No game selected';
+                try {
+                    var names = FS.readdir('/game').filter(function (n) {
+                        return n !== '.' && n !== '..' && FS.isDir(FS.stat('/game/' + n).mode);
+                    });
+                    var links = document.getElementById('games');
+                    names.forEach(function (n) {
+                        var a = document.createElement('a');
+                        a.href = '?game=' + encodeURIComponent(n);
+                        a.textContent = n;
+                        links.appendChild(a);
+                    });
+                } catch (e) {}
+                Module.canvas.focus();
+            }
+        };
+        window.onerror = function (message) { statusEl.textContent = 'Error: ' + message; };
+    </script>
+    {{{ SCRIPT }}}
+</body>
+</html>

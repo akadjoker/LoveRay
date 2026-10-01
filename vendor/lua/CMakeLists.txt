@@ -60,7 +60,7 @@ elseif(APPLE)
     target_compile_definitions(lua PUBLIC LUA_USE_MACOSX LUA_USE_POSIX LUA_USE_DLOPEN)
     target_link_libraries(lua PUBLIC m dl)
 elseif(WIN32)
-    target_compile_definitions(lua PUBLIC LUA_BUILD_AS_DLL)
+    # Static library: no DLL export/import decorations.
 else()
     target_compile_definitions(lua PUBLIC LUA_USE_POSIX)
 endif()
