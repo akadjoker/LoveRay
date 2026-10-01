@@ -108,6 +108,6 @@ Runs the API and physics conformance games plus every example headless under Xvf
 
 ## Credits
 
-The original LoveRay was a quick experiment mixing raylib, Lua and Chipmunk. The previous implementation is kept under `legacy/`.
+The original LoveRay was a quick experiment mixing raylib and Lua with its own bindings. The previous implementation is kept under `legacy/` for reference.
 
 Built on raylib, Lua, Box2D and the DejaVu Sans font.
