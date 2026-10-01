@@ -1,201 +1,113 @@
 # LoveRay
-LoveRay2d is not 100% compatible with the original Love2d, but it includes the main events that are compatible with Love2d’s characteristics of input, draw, and transform. 
 
-Love2d using only Lua, Raylib, and Chipmunk2d for physics.
+A [Love2D](https://love2d.org) 11.5 compatible runtime built on [raylib](https://www.raylib.com), Lua 5.4 and Box2D.
 
-Features:
+Write a game with the Love2D API, run it with `love <game directory>` on Linux, Windows or in the browser.
 
-- Fast and efficient 2D rendering using the Raylib library
-- Accurate and realistic 2D physics simulation using the Chipmunk2D library
-- Lua script support for game logic and events
-- Easy to use 
-- Support for audio, keyboard and mouse input, and other common 2D game features
+![physics](docs/media/001.gif)
 
-<img src="https://raw.githubusercontent.com/akadjoker/LoveRay/main/001.gif">
-<img src="https://raw.githubusercontent.com/akadjoker/LoveRay/main/002.gif">
-<img src="https://raw.githubusercontent.com/akadjoker/LoveRay/main/003.gif">
-<img src="https://raw.githubusercontent.com/akadjoker/LoveRay/main/004.gif">
+## Status
 
-Api List
-chipmunk
+LoveRay implements the core of the Love2D API: `love.run` and the callback loop, `conf.lua`, `love.filesystem` with a save directory, `love.graphics` (shapes, text, images, quads, canvases, sprite batches, blend modes, scissor, transforms), `love.keyboard`, `love.mouse`, `love.joystick`, `love.audio`, `love.math`, `love.image`, `love.window`, `love.timer`, `love.event` and `love.physics` with every Box2D joint type.
 
-newShapeFilter 
-newDynamic
-newStatic
-newKinematic
+Not implemented yet: shaders, meshes, particle systems, video, threads, `love.data`, `love.sound`, `love.font` and `love.touch`. See [docs/API.md](docs/API.md) for the function-level status and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
 
+## Quick start
 
-newPinJoint
-newSlideJoint
-newPivotJoint
-newRatchetJoint
-newGearJoint
-newMotor
-newGrooveJoint  
-newRotaryLimitJoint
+```sh
+git clone https://github.com/akadjoker/LoveRay
+cd LoveRay
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./bin/love examples/hello
+```
 
-getStaticBody
+Linux needs the OpenGL and X11 development packages, for example on Debian or Ubuntu:
 
-update
-draw
-clear
-setGravity
-setDebugFill
+```sh
+sudo apt-get install cmake ninja-build libgl1-mesa-dev libx11-dev libxrandr-dev \
+  libxcursor-dev libxinerama-dev libxi-dev libxkbcommon-dev
+```
 
-getBodyAtPoint
-getBodyAtMouse
+On Windows use MSYS2 (`mingw-w64-x86_64-gcc`, `cmake`, `ninja`). All third-party libraries are vendored, nothing else is required.
 
+Prebuilt Linux, Windows and web packages are attached to every [release](https://github.com/akadjoker/LoveRay/releases).
 
-;Body
-remove
-addBox
-addCircle
-addLine
-setPosition
-getPosition
-setAngle
-getAngle
-setMass
-getMass
-getVelocity
-setVelocity
-getAngularVelocity
-setAngularVelocity
-setForce
-getForce
-setTorque
-getTorque
-applyForceAtWorldPoint
-applyForceAtLocalPoint
-applyImpulseAtWorldPoint
-applyImpulseAtLocalPoint
-getVelocityAtWorldPoint
-getVelocityAtLocalPoint
-setCenterOfGravity
-getCenterOfGravity
-localToWorld
-worldToLocal
+## Running games
 
-;Shape
-setSensor
-getSensor
-setElasticity
-getElasticity
-setFriction
-getFriction
-setSurfaceVelocity
-getSurfaceVelocity
-setFilter
-getFilter
-getMoment
-getArea
-getCenterOfGravity
+```sh
+love path/to/game            # a directory containing main.lua
+love path/to/game/main.lua   # also accepted
+love                         # shows the "no game" screen
+love --version
+love path/to/game --frames 300 --screenshot shot.png   # headless testing
+```
 
+A game is a folder with `main.lua` and an optional `conf.lua`:
 
-;Joint
-remove
-setAnchoB
-setAnchorA
-setMaxForce
+```lua
+function love.conf(t)
+    t.window.title = "My game"
+    t.window.width = 800
+    t.window.height = 600
+end
+```
 
-;Keyboard
+```lua
+local player = { x = 100, y = 100 }
 
-isDown
-check
-down
-press
-release
-up
-keyPressed
-charPressed
-setExitKey
+function love.update(dt)
+    if love.keyboard.isDown("right") then player.x = player.x + 200 * dt end
+end
 
-;Mouse
-getPosition
-getDelta
-getX
-getY
-isDown
-check
-press
-release
+function love.draw()
+    love.graphics.rectangle("fill", player.x, player.y, 32, 32)
+end
+```
 
-;Timer
-getTime
-getDelta
-getFPS
+Errors show the usual blue screen with a traceback. Press `R` to restart or `Escape` to quit. Setting `t.loveray.hotreload = true` in `conf.lua` restarts the game whenever `main.lua` or `conf.lua` changes.
 
+## Examples
 
-;Os
-getOS
-getMemUsage
+| Example | Shows |
+| --- | --- |
+| `examples/hello` | shapes, text wrapping and alignment, colored text, transforms |
+| `examples/sprites` | images, quads, sprite batches, keyboard and mouse |
+| `examples/input` | every input callback |
+| `examples/canvas` | offscreen rendering, blend modes, scissor |
+| `examples/physics` | bodies, joints, contacts, mouse dragging, a wheeled car |
 
-;Filesystem
-exists
-isFile
-getInfo
-isDirectory
-getWorkingDirectory
-getPath
-read
-load
+## Web build
 
+With the Emscripten SDK active:
 
-;Audio
-setMasterVolume
-newSound
-newMusic
+```sh
+emcmake cmake -S . -B build-web -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build-web
+```
 
-;Music
-isPlaying
-play
-pause
-stop
-resume
-seek
-setVolume
-setPitch
-setPan
-getTimeLength
-getTimePlayed
+This produces `bin/love.html`, `love.js`, `love.wasm` and `love.data`. Serve them over HTTP and pick a game with `?game=<name>`. The `examples` folder is preloaded by default, use `-DLOVERAY_WEB_GAME=<dir>` to bundle your own games.
 
-;Sound
-play
-stop
-pause
-resume
-setVolume
-setPitch
-setPan
-isPlaying
+## Differences from Love2D
 
-;Graphics
-setBackgroundColor
-setColor
-getFont
-getWidth
-getHeight
-pop
-push
-rotate
-scale
-translate
-shear
-clear
-begin
-present
-draw
-point
-line
-rectangle
-circle
-print
-newImage
-newQuad
-newSound
-newFont
+- Fonts are rasterized from TrueType files at load time. The built-in font is DejaVu Sans.
+- Stencils, shaders and depth buffers do not exist yet, the matching functions are no-ops or raise a clear error.
+- `love.physics` uses Box2D 2.4, so joint stiffness is expressed through frequency and damping ratio helpers that map onto it.
+- `love.filesystem` reads from the game folder and the save directory but cannot mount archives or `.love` files.
+- `Source:queue`, audio effects and custom image cursors are not available.
 
-PS:
-I don't know if I'm going to update this project because I'm making another version that isn't compatible with Love2d but a framewoek with other types of features that I think are important for game development
-https://djokergames.wordpress.com/news/
+LoveRay-only additions: `love.loveray` (version information), `World:draw()` for Box2D debug rendering, the `--frames` and `--screenshot` options and the `loveray` section in `conf.lua`.
 
+## Tests
+
+```sh
+tests/smoke.sh
+```
+
+Runs the API and physics conformance games plus every example headless under Xvfb, and fails on the first error.
+
+## Credits
+
+The original LoveRay was a quick experiment mixing raylib, Lua and Chipmunk. The previous implementation is kept under `legacy/`.
+
+Built on raylib, Lua, Box2D and the DejaVu Sans font.

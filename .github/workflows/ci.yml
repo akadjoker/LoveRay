@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  linux:
+    name: Linux
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build libgl1-mesa-dev libx11-dev libxrandr-dev \
+            libxcursor-dev libxinerama-dev libxi-dev libxkbcommon-dev libgl1-mesa-dri xvfb
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Smoke tests
+        run: tests/smoke.sh
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: ~/.local/share/loveray/**/*.png
+          if-no-files-found: ignore
+      - name: Package
+        run: |
+          mkdir -p dist/loveray-linux-x86_64
+          cp bin/love README.md dist/loveray-linux-x86_64/
+          cp -r examples dist/loveray-linux-x86_64/
+          tar -C dist -czf loveray-linux-x86_64.tar.gz loveray-linux-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: loveray-linux-x86_64
+          path: loveray-linux-x86_64.tar.gz
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            zip
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Package
+        run: |
+          mkdir -p dist/loveray-windows-x86_64
+          cp bin/love.exe README.md dist/loveray-windows-x86_64/
+          cp -r examples dist/loveray-windows-x86_64/
+          cd dist && zip -r ../loveray-windows-x86_64.zip loveray-windows-x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: loveray-windows-x86_64
+          path: loveray-windows-x86_64.zip
+
+  web:
+    name: Web
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 6.0.10
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+      - name: Configure
+        run: emcmake cmake -S . -B build-web -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build-web
+      - name: Package
+        run: |
+          mkdir -p dist/loveray-web
+          cp bin/love.html dist/loveray-web/index.html
+          cp bin/love.js bin/love.wasm bin/love.data dist/loveray-web/
+          cp README.md dist/loveray-web/
+          tar -C dist -czf loveray-web.tar.gz loveray-web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: loveray-web
+          path: loveray-web.tar.gz
+
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows, web]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/loveray-linux-x86_64/loveray-linux-x86_64.tar.gz
+            artifacts/loveray-windows-x86_64/loveray-windows-x86_64.zip
+            artifacts/loveray-web/loveray-web.tar.gz
+          generate_release_notes: true
