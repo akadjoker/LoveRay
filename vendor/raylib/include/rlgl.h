@@ -694,6 +694,12 @@ RLAPI bool rlIsStereoRenderEnabled(void);               // Check if stereo rende
 
 RLAPI void rlClearColor(unsigned char r, unsigned char g, unsigned char b, unsigned char a); // Clear color buffer with color
 RLAPI void rlClearScreenBuffers(void);                  // Clear used screen buffers (color and depth)
+RLAPI void rlEnableStencilTest(void);                   // Enable stencil test
+RLAPI void rlDisableStencilTest(void);                  // Disable stencil test
+RLAPI void rlStencilFunc(int glFunc, int ref, unsigned int mask); // Set the stencil comparison (using OpenGL function values)
+RLAPI void rlStencilOp(int glFail, int glDepthFail, int glPass);  // Set the stencil operations (using OpenGL operation values)
+RLAPI void rlStencilMask(unsigned int mask);            // Set which stencil bits can be written
+RLAPI void rlClearStencil(int value);                   // Clear the stencil buffer of the current framebuffer to a value
 RLAPI void rlCheckErrors(void);                         // Check and log OpenGL error codes
 RLAPI void rlSetBlendMode(int mode);                    // Set blending mode
 RLAPI void rlSetBlendFactors(int glSrcFactor, int glDstFactor, int glEquation); // Set blending mode factor and equation (using OpenGL factors)
@@ -873,6 +879,14 @@ RLAPI void rlLoadDrawQuad(void);     // Load and draw a quad
         //#include <EGL/egl.h>          // EGL library -> not required, platform layer
         #include <GLES2/gl2.h>          // OpenGL ES 2.0 library
         #include <GLES2/gl2ext.h>       // OpenGL ES 2.0 extensions library
+    #endif
+
+    // Packed depth-stencil renderbuffers are core in WebGL 1 but only an extension in ES 2.0 headers
+    #ifndef GL_DEPTH_STENCIL
+        #define GL_DEPTH_STENCIL 0x84F9
+    #endif
+    #ifndef GL_DEPTH_STENCIL_ATTACHMENT
+        #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
     #endif
 
     // It seems OpenGL ES 2.0 instancing entry points are not defined on Raspberry Pi
@@ -2065,6 +2079,19 @@ void rlClearScreenBuffers(void)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);     // Clear used buffers: Color and Depth (Depth is used for 3D)
     //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);     // Stencil buffer not used...
+}
+
+void rlEnableStencilTest(void) { glEnable(GL_STENCIL_TEST); }
+void rlDisableStencilTest(void) { glDisable(GL_STENCIL_TEST); }
+void rlStencilFunc(int glFunc, int ref, unsigned int mask) { glStencilFunc((GLenum)glFunc, ref, mask); }
+void rlStencilOp(int glFail, int glDepthFail, int glPass) { glStencilOp((GLenum)glFail, (GLenum)glDepthFail, (GLenum)glPass); }
+void rlStencilMask(unsigned int mask) { glStencilMask(mask); }
+
+void rlClearStencil(int value)
+{
+    glStencilMask(0xFF);
+    glClearStencil(value);
+    glClear(GL_STENCIL_BUFFER_BIT);
 }
 
 // Check and log OpenGL error codes
@@ -3372,7 +3399,11 @@ unsigned int rlLoadTextureDepth(int width, int height, bool useRenderBuffer)
         // NOTE: A renderbuffer is simpler than a texture and could offer better performance on embedded devices
         glGenRenderbuffers(1, &id);
         glBindRenderbuffer(GL_RENDERBUFFER, id);
-        glRenderbufferStorage(GL_RENDERBUFFER, glInternalFormat, width, height);
+#if defined(GRAPHICS_API_OPENGL_33)
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+#else
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_STENCIL, width, height);
+#endif
 
         glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
@@ -3742,7 +3773,7 @@ void rlFramebufferAttach(unsigned int fboId, unsigned int texId, int attachType,
         case RL_ATTACHMENT_DEPTH:
         {
             if (texType == RL_ATTACHMENT_TEXTURE2D) glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texId, mipLevel);
-            else if (texType == RL_ATTACHMENT_RENDERBUFFER)  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, texId);
+            else if (texType == RL_ATTACHMENT_RENDERBUFFER)  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, texId);
 
         } break;
         case RL_ATTACHMENT_STENCIL:

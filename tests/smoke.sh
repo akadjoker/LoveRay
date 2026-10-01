@@ -30,6 +30,7 @@ run "api tests" "$ROOT/tests/api" --frames 10
 run "physics tests" "$ROOT/tests/physics" --frames 10
 run "shader tests" "$ROOT/tests/shader" --frames 10
 run "particle tests" "$ROOT/tests/particles" --frames 10
+run "stencil tests" "$ROOT/tests/stencil"
 
 if command -v python3 >/dev/null; then
     python3 "$ROOT/tests/make_archives.py" "$OUT"

@@ -48,6 +48,8 @@ struct State
     Rectangle scissorRect = {0, 0, 0, 0};
     bool colorMask[4] = {true, true, true, true};
     bool wireframe = false;
+    int stencilMode = 0; // index into STENCIL_NAMES, 0 is "always" (test off)
+    int stencilValue = 0;
     luax::Ref font;
     luax::Ref canvas;
     luax::Ref shader;
@@ -199,6 +201,32 @@ void applyScissor()
     }
 }
 
+const char *const STENCIL_NAMES[] = {"always", "equal", "notequal", "less", "lequal", "greater", "gequal"};
+const int STENCIL_VALUES[] = {0, 1, 2, 3, 4, 5, 6};
+// OpenGL compares the reference against the buffer, Love2D compares the buffer
+// against the value, so the orderings are mirrored.
+const int STENCIL_GL_FUNCS[] = {0x0207, 0x0202, 0x0205, 0x0204, 0x0206, 0x0201, 0x0203};
+
+const char *const STENCIL_ACTION_NAMES[] = {"replace", "increment", "decrement", "incrementwrap", "decrementwrap", "invert"};
+const int STENCIL_ACTION_VALUES[] = {0x1E01, 0x1E02, 0x1E03, 0x8507, 0x8508, 0x150A};
+
+constexpr int GL_KEEP_OP = 0x1E00;
+constexpr int GL_ALWAYS_FUNC = 0x0207;
+
+void applyStencilTest()
+{
+    rlDrawRenderBatchActive();
+    if (g_state.stencilMode == 0)
+    {
+        rlDisableStencilTest();
+        return;
+    }
+    rlEnableStencilTest();
+    rlStencilFunc(STENCIL_GL_FUNCS[g_state.stencilMode], g_state.stencilValue, 0xFF);
+    rlStencilOp(GL_KEEP_OP, GL_KEEP_OP, GL_KEEP_OP);
+    rlStencilMask(0);
+}
+
 CanvasObj *activeCanvas(lua_State *L)
 {
     if (!g_state.canvas.valid())
@@ -282,6 +310,7 @@ void ensureFrame()
     g_pushKinds.clear();
     applyBlendMode();
     applyScissor();
+    applyStencilTest();
     if (g_shader != nullptr)
     {
         shaderActivate(g_shader, GetScreenWidth(), GetScreenHeight());
@@ -873,6 +902,8 @@ int l_reset(lua_State *L)
     g_state.premultiplied = false;
     g_state.scissor = false;
     g_state.wireframe = false;
+    g_state.stencilMode = 0;
+    g_state.stencilValue = 0;
     for (bool &m : g_state.colorMask)
     {
         m = true;
@@ -889,6 +920,7 @@ int l_reset(lua_State *L)
         }
         applyBlendMode();
         applyScissor();
+        applyStencilTest();
         rlColorMask(true, true, true, true);
         rlDisableWireMode();
         while (!g_pushKinds.empty())
@@ -910,16 +942,30 @@ int l_clear(lua_State *L)
 {
     ensureFrame();
     Color c = g_state.background;
+    int next = 1;
     if (lua_isnumber(L, 1) || lua_istable(L, 1))
     {
-        readColor(L, 1, c);
-    }
-    else if (lua_isboolean(L, 1))
-    {
-        // clear(true/false, ...) clears color/stencil/depth selectively; the
-        // color buffer is always cleared here.
+        next = readColor(L, 1, c);
     }
     ClearBackground(c);
+
+    // clear(r, g, b, a, clearstencil, cleardepth): the stencil buffer is cleared
+    // unless told otherwise, and a number clears it to that value.
+    int stencilValue = 0;
+    bool clearStencil = true;
+    if (lua_isboolean(L, next))
+    {
+        clearStencil = lua_toboolean(L, next) != 0;
+    }
+    else if (lua_isnumber(L, next))
+    {
+        stencilValue = static_cast<int>(lua_tointeger(L, next));
+    }
+    if (clearStencil)
+    {
+        rlClearStencil(stencilValue);
+        rlStencilMask(0);
+    }
     return 0;
 }
 
@@ -1041,6 +1087,8 @@ int l_push(lua_State *L)
         snapshot->scissor = g_state.scissor;
         snapshot->scissorRect = g_state.scissorRect;
         snapshot->wireframe = g_state.wireframe;
+        snapshot->stencilMode = g_state.stencilMode;
+        snapshot->stencilValue = g_state.stencilValue;
         std::memcpy(snapshot->colorMask, g_state.colorMask, sizeof(snapshot->colorMask));
         g_state.font.push(L);
         snapshot->font.set(L, -1);
@@ -1083,6 +1131,8 @@ int l_pop(lua_State *L)
         g_state.scissor = snapshot->scissor;
         g_state.scissorRect = snapshot->scissorRect;
         g_state.wireframe = snapshot->wireframe;
+        g_state.stencilMode = snapshot->stencilMode;
+        g_state.stencilValue = snapshot->stencilValue;
         std::memcpy(g_state.colorMask, snapshot->colorMask, sizeof(g_state.colorMask));
         snapshot->font.push(L);
         if (lua_isnil(L, -1))
@@ -1106,6 +1156,7 @@ int l_pop(lua_State *L)
         delete snapshot;
         applyBlendMode();
         applyScissor();
+        applyStencilTest();
         rlColorMask(g_state.colorMask[0], g_state.colorMask[1], g_state.colorMask[2], g_state.colorMask[3]);
     }
     return 0;
@@ -1807,25 +1858,77 @@ int l_unsupported(lua_State *L)
     return luaL_error(L, "love.graphics.%s is not supported by LoveRay yet", name);
 }
 
+// stencil(fn, action = "replace", value = 1, keepvalues = false)
 int l_stencil(lua_State *L)
 {
-    // No stencil buffer: run the stencil function so its drawing still shows.
     luaL_checktype(L, 1, LUA_TFUNCTION);
+    int action = lua_isnoneornil(L, 2) ? STENCIL_ACTION_VALUES[0]
+                                       : luax::checkenum(L, 2, STENCIL_ACTION_NAMES, STENCIL_ACTION_VALUES, "stencil action");
+    int value = luax::optint(L, 3, 1);
+    bool keep = luax::optboolean(L, 4, false);
+    if (value < 0 || value > 255)
+    {
+        return luaL_error(L, "Stencil value must be between 0 and 255");
+    }
+
+    ensureFrame();
+    rlDrawRenderBatchActive();
+    if (!keep)
+    {
+        rlClearStencil(0);
+    }
+    rlEnableStencilTest();
+    rlStencilFunc(GL_ALWAYS_FUNC, value, 0xFF);
+    rlStencilOp(GL_KEEP_OP, GL_KEEP_OP, action);
+    rlStencilMask(0xFF);
+    rlColorMask(false, false, false, false);
+
     lua_pushvalue(L, 1);
-    lua_call(L, 0, 0);
+    int status = lua_pcall(L, 0, 0, 0);
+
+    rlDrawRenderBatchActive();
+    rlColorMask(g_state.colorMask[0], g_state.colorMask[1], g_state.colorMask[2], g_state.colorMask[3]);
+    applyStencilTest();
+    if (status != LUA_OK)
+    {
+        return lua_error(L);
+    }
     return 0;
 }
 
-int l_noop(lua_State *L)
+// setStencilTest() disables the test, setStencilTest(comparemode, comparevalue) enables it.
+int l_setStencilTest(lua_State *L)
 {
+    int mode = 0;
+    int value = 0;
+    if (!lua_isnoneornil(L, 1))
+    {
+        mode = luax::checkenum(L, 1, STENCIL_NAMES, STENCIL_VALUES, "compare mode");
+        value = static_cast<int>(luaL_checkinteger(L, 2));
+        if (value < 0 || value > 255)
+        {
+            return luaL_error(L, "Stencil test value must be between 0 and 255");
+        }
+    }
+    g_state.stencilMode = mode;
+    g_state.stencilValue = value;
+    if (g_frameActive)
+    {
+        applyStencilTest();
+    }
     return 0;
 }
 
 int l_getStencilTest(lua_State *L)
 {
-    lua_pushstring(L, "always");
-    lua_pushinteger(L, 0);
+    lua_pushstring(L, STENCIL_NAMES[g_state.stencilMode]);
+    lua_pushinteger(L, g_state.stencilValue);
     return 2;
+}
+
+int l_noop(lua_State *L)
+{
+    return 0;
 }
 
 int l_getDepthMode(lua_State *L)
@@ -1923,7 +2026,7 @@ const luaL_Reg FUNCS[] = {
     {"isGammaCorrect", l_isGammaCorrect},
     // partial / unsupported
     {"stencil", l_stencil},
-    {"setStencilTest", l_noop},
+    {"setStencilTest", l_setStencilTest},
     {"getStencilTest", l_getStencilTest},
     {"setDepthMode", l_noop},
     {"getDepthMode", l_getDepthMode},
