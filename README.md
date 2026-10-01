@@ -42,6 +42,7 @@ Prebuilt Linux, Windows and web packages are attached to every [release](https:/
 ```sh
 love path/to/game            # a directory containing main.lua
 love path/to/game/main.lua   # also accepted
+love game.love               # a zip archive with main.lua at its root
 love                         # shows the "no game" screen
 love --version
 love path/to/game --frames 300 --screenshot shot.png   # headless testing
@@ -68,6 +69,17 @@ function love.draw()
     love.graphics.rectangle("fill", player.x, player.y, 32, 32)
 end
 ```
+
+### Shipping a game
+
+Zip the contents of your game folder (`main.lua` at the top level) and rename it to `game.love`. To ship a single executable, append the archive to the runtime:
+
+```sh
+cat love game.love > mygame && chmod +x mygame      # Linux
+copy /b love.exe+game.love mygame.exe               # Windows
+```
+
+A fused executable runs its own game and passes every command line argument to it. `love.filesystem.mount` can add further zip files or folders at runtime.
 
 Errors show the usual blue screen with a traceback. Press `R` to restart or `Escape` to quit. Setting `t.loveray.hotreload = true` in `conf.lua` restarts the game whenever `main.lua` or `conf.lua` changes.
 
@@ -99,7 +111,7 @@ This produces `bin/love.html`, `love.js`, `love.wasm` and `love.data`. Serve the
 - Fonts are rasterized from TrueType files at load time. The built-in font is DejaVu Sans.
 - Shaders target GLSL 3.30 on desktop and GLSL ES 1.00 in the browser. Stencils and depth buffers do not exist yet, the matching functions are no-ops.
 - `love.physics` uses Box2D 2.4, so joint stiffness is expressed through frequency and damping ratio helpers that map onto it.
-- `love.filesystem` reads from the game folder and the save directory but cannot mount archives or `.love` files.
+- `love.filesystem` reads from the game folder, `.love` and zip archives and the save directory. ZIP64 and encrypted archives are not supported.
 - `Source:queue`, audio effects and custom image cursors are not available.
 
 LoveRay-only additions: `love.loveray` (version information), `World:draw()` for Box2D debug rendering, the `--frames` and `--screenshot` options and the `loveray` section in `conf.lua`.

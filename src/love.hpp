@@ -70,7 +70,8 @@ std::string resolveRead(const std::string &path);
 // creating the intermediate directories. Returns "" on failure.
 std::string resolveWrite(const std::string &path);
 
-bool readFile(const std::string &path, std::vector<unsigned char> &out);
+// `error` receives the reason when the file exists but cannot be read (corrupt archive entry).
+bool readFile(const std::string &path, std::vector<unsigned char> &out, std::string *error = nullptr);
 } // namespace filesystem
 
 namespace window

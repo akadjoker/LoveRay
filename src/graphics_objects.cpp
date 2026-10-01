@@ -758,6 +758,10 @@ int l_newFont(lua_State *L)
     {
         // BMFont descriptors reference a texture by path; raylib needs a file.
         std::string real = filesystem::resolveRead(path);
+        if (real.empty())
+        {
+            return luaL_error(L, "BMFont files inside archives are not supported (%s)", path.c_str());
+        }
         font->font = LoadFont(real.c_str());
     }
     else

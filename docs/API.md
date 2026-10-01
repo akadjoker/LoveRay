@@ -11,7 +11,7 @@ Legend: **full** works as documented, **partial** works with the listed limits, 
 | love | full | `getVersion`, `isVersionCompatible`, `love.run`, `love.errorhandler`, `love.handlers`, all input and window callbacks |
 | love.audio | partial | `Source` objects (static and stream), master volume. Positional audio is stored but not spatialized. No effects, filters, recording or queueable sources |
 | love.event | full | `pump`, `poll`, `push`, `quit`, `clear`, `wait` |
-| love.filesystem | partial | Reads from the game folder and save directory, `File` and `FileData` objects, `require` through the game folder. No archives or `.love` files, `remove` only deletes inside the save directory |
+| love.filesystem | full | Game folder, `.love` and zip archives (deflate and stored), a zip appended to the executable, `mount` and `unmount` for files, folders and `FileData`, mount points and mount order, save directory, `File` and `FileData` objects, `require` through mounted paths. No ZIP64, encrypted archives or other archive formats, `remove` only deletes inside the save directory |
 | love.graphics | partial | See below |
 | love.image | partial | `ImageData` with `getPixel`, `setPixel`, `mapPixel`, `paste`, `encode`. Only the `rgba8` format |
 | love.joystick | partial | Gamepads through raylib, gamepad buttons and axes, `joystick*` and `gamepad*` events. No vibration, hats or custom mappings |

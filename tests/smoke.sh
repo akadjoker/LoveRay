@@ -31,6 +31,17 @@ run "physics tests" "$ROOT/tests/physics" --frames 10
 run "shader tests" "$ROOT/tests/shader" --frames 10
 run "particle tests" "$ROOT/tests/particles" --frames 10
 
+if command -v python3 >/dev/null; then
+    python3 "$ROOT/tests/make_archives.py" "$OUT"
+    run "archive tests (directory)" "$ROOT/tests/archive" "$OUT/data.zip" dir
+    run "archive tests (.love)" "$OUT/archive.love" "$OUT/data.zip" archive
+    cat "$LOVE" "$OUT/archive.love" > "$OUT/fused"
+    chmod +x "$OUT/fused"
+    LOVE="$OUT/fused" run "archive tests (fused executable)" "$OUT/data.zip" fused
+else
+    echo "python3 not found, skipping the archive tests"
+fi
+
 for example in "$ROOT"/examples/*/; do
     name="$(basename "$example")"
     run "example $name" "$example" --frames 60 --screenshot "$name.png"

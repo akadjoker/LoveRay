@@ -1,13 +1,17 @@
 // filesystem.cpp - love.filesystem
 //
 // Love2D exposes a virtual filesystem rooted at the game directory with a
-// writable save directory layered on top. LoveRay implements the same model
-// directly on the host filesystem (no archive support yet).
+// writable save directory layered on top. The save directory is served from
+// the host filesystem and everything else from the virtual filesystem in
+// vfs.cpp (directories and zip archives, including a zip appended to the
+// executable).
 #include "love.hpp"
 #include "luax.hpp"
+#include "vfs.hpp"
 
 #include <sys/stat.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -15,6 +19,12 @@
 #include <fstream>
 #include <string>
 #include <vector>
+
+#if defined(_WIN32)
+extern "C" __declspec(dllimport) unsigned long __stdcall GetModuleFileNameA(void *module, char *file, unsigned long size);
+#elif defined(__linux__)
+#include <unistd.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -27,6 +37,8 @@ namespace
 {
 
 std::string g_executable;
+bool g_fused = false;
+bool g_sourceIsArchive = false;
 std::string g_source;
 std::string g_identity;
 bool g_appendIdentity = false;
@@ -203,10 +215,27 @@ void pushInfo(lua_State *L, const Info &info)
 // C++ API used by the other modules
 // ---------------------------------------------------------------------------
 
-void setSource(const std::string &dir)
+void setSource(const std::string &path)
 {
-    g_source = normalize(dir);
+    vfs::clear();
+    g_source = normalize(path);
     g_watched.clear();
+    std::string error;
+    Info info = infoOf(g_source);
+    g_sourceIsArchive = std::strcmp(info.type, "file") == 0;
+    if (g_sourceIsArchive)
+    {
+        if (!vfs::mountArchiveFile(g_source, "", true, error))
+        {
+            log(LogLevel::Error, "Could not open %s: %s", g_source.c_str(), error.c_str());
+        }
+        g_watched.push_back({g_source, modTimeOf(g_source)});
+        return;
+    }
+    if (!vfs::mountDirectory(g_source, "", true, error))
+    {
+        log(LogLevel::Error, "%s", error.c_str());
+    }
     for (const char *name : {"main.lua", "conf.lua"})
     {
         std::string real = join(g_source, name);
@@ -244,6 +273,38 @@ std::string getSaveDirectory()
     return base;
 }
 
+namespace
+{
+
+Info infoVirtual(const std::string &path)
+{
+    Info info;
+    std::string clean = normalize(path);
+    if (!isSafeRelative(clean))
+    {
+        return info;
+    }
+    if (!g_identity.empty())
+    {
+        Info saved = infoOf(join(getSaveDirectory(), clean));
+        if (saved.exists)
+        {
+            return saved;
+        }
+    }
+    vfs::Stat stat = vfs::stat(clean);
+    if (stat.exists)
+    {
+        info.exists = true;
+        info.type = stat.isDirectory ? "directory" : "file";
+        info.size = stat.size;
+        info.modtime = stat.modtime;
+    }
+    return info;
+}
+
+} // namespace
+
 std::string resolveRead(const std::string &path)
 {
     std::string clean = normalize(path);
@@ -259,12 +320,7 @@ std::string resolveRead(const std::string &path)
             return save;
         }
     }
-    std::string source = join(g_source.empty() ? std::string(".") : g_source, clean);
-    if (infoOf(source).exists)
-    {
-        return source;
-    }
-    return "";
+    return vfs::realFile(clean);
 }
 
 std::string resolveWrite(const std::string &path)
@@ -284,27 +340,32 @@ std::string resolveWrite(const std::string &path)
     return full;
 }
 
-bool readFile(const std::string &path, std::vector<unsigned char> &out)
+bool readFile(const std::string &path, std::vector<unsigned char> &out, std::string *error)
 {
-    std::string real = resolveRead(path);
-    if (real.empty())
+    std::string clean = normalize(path);
+    if (!isSafeRelative(clean))
     {
         return false;
     }
-    std::ifstream in(real, std::ios::binary);
-    if (!in)
+    std::string real = g_identity.empty() ? std::string() : join(getSaveDirectory(), clean);
+    if (!real.empty() && std::strcmp(infoOf(real).type, "file") == 0)
     {
-        return false;
+        std::ifstream in(real, std::ios::binary);
+        if (!in)
+        {
+            return false;
+        }
+        in.seekg(0, std::ios::end);
+        std::streamoff size = in.tellg();
+        in.seekg(0, std::ios::beg);
+        out.resize(static_cast<size_t>(size > 0 ? size : 0));
+        if (size > 0)
+        {
+            in.read(reinterpret_cast<char *>(out.data()), size);
+        }
+        return static_cast<bool>(in) || size == 0;
     }
-    in.seekg(0, std::ios::end);
-    std::streamoff size = in.tellg();
-    in.seekg(0, std::ios::beg);
-    out.resize(static_cast<size_t>(size > 0 ? size : 0));
-    if (size > 0)
-    {
-        in.read(reinterpret_cast<char *>(out.data()), size);
-    }
-    return static_cast<bool>(in) || size == 0;
+    return vfs::readFile(clean, out, error);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,12 +381,19 @@ const char *FILEDATA_TYPE = "FileData";
 struct File
 {
     std::string name;
-    std::FILE *handle = nullptr;
+    std::FILE *handle = nullptr;  // write and append modes
+    std::vector<unsigned char> data; // read mode keeps the whole file in memory
+    size_t position = 0;
     char mode = 'c'; // 'r', 'w', 'a' or 'c' (closed)
 
     ~File()
     {
         close();
+    }
+
+    bool isOpen() const
+    {
+        return mode != 'c';
     }
 
     void close()
@@ -335,6 +403,9 @@ struct File
             std::fclose(handle);
             handle = nullptr;
         }
+        data.clear();
+        data.shrink_to_fit();
+        position = 0;
         mode = 'c';
     }
 };
@@ -353,28 +424,23 @@ File *checkFile(lua_State *L, int idx)
 bool openFile(File &file, char mode, std::string &err)
 {
     file.close();
-    std::string real;
-    const char *fmode = "rb";
     if (mode == 'r')
     {
-        real = resolveRead(file.name);
-        if (real.empty())
+        if (!readFile(file.name, file.data))
         {
             err = "Could not open file " + file.name + ". Does not exist.";
             return false;
         }
+        file.mode = 'r';
+        return true;
     }
-    else
+    std::string real = resolveWrite(file.name);
+    if (real.empty())
     {
-        real = resolveWrite(file.name);
-        fmode = (mode == 'w') ? "wb" : "ab";
-        if (real.empty())
-        {
-            err = "Could not open file " + file.name + " for writing.";
-            return false;
-        }
+        err = "Could not open file " + file.name + " for writing.";
+        return false;
     }
-    file.handle = std::fopen(real.c_str(), fmode);
+    file.handle = std::fopen(real.c_str(), mode == 'w' ? "wb" : "ab");
     if (file.handle == nullptr)
     {
         err = "Could not open file " + file.name + ".";
@@ -415,7 +481,7 @@ int file_open(lua_State *L)
 int file_close(lua_State *L)
 {
     File *file = checkFile(L, 1);
-    bool wasOpen = file->handle != nullptr;
+    bool wasOpen = file->isOpen();
     file->close();
     lua_pushboolean(L, wasOpen);
     return 1;
@@ -423,7 +489,7 @@ int file_close(lua_State *L)
 
 int file_isOpen(lua_State *L)
 {
-    lua_pushboolean(L, checkFile(L, 1)->handle != nullptr);
+    lua_pushboolean(L, checkFile(L, 1)->isOpen());
     return 1;
 }
 
@@ -442,16 +508,24 @@ int file_getFilename(lua_State *L)
 
 long long fileSize(File &file)
 {
-    if (file.handle == nullptr)
+    if (file.mode == 'r')
     {
-        std::string real = resolveRead(file.name);
-        return infoOf(real).size;
+        return static_cast<long long>(file.data.size());
     }
-    long pos = std::ftell(file.handle);
-    std::fseek(file.handle, 0, SEEK_END);
-    long size = std::ftell(file.handle);
-    std::fseek(file.handle, pos, SEEK_SET);
-    return size;
+    if (file.handle != nullptr)
+    {
+        long pos = std::ftell(file.handle);
+        std::fseek(file.handle, 0, SEEK_END);
+        long size = std::ftell(file.handle);
+        std::fseek(file.handle, pos, SEEK_SET);
+        return size;
+    }
+    std::vector<unsigned char> data;
+    if (!readFile(file.name, data))
+    {
+        return 0;
+    }
+    return static_cast<long long>(data.size());
 }
 
 int file_getSize(lua_State *L)
@@ -463,22 +537,21 @@ int file_getSize(lua_State *L)
 int file_read(lua_State *L)
 {
     File *file = checkFile(L, 1);
-    if (file->handle == nullptr || file->mode != 'r')
+    if (file->mode != 'r')
     {
         lua_pushnil(L);
         lua_pushstring(L, "File is not opened for reading.");
         return 2;
     }
-    long long remaining = fileSize(*file) - std::ftell(file->handle);
+    long long remaining = static_cast<long long>(file->data.size() - file->position);
     long long count = static_cast<long long>(luaL_optinteger(L, 2, remaining));
     if (count < 0 || count > remaining)
     {
         count = remaining;
     }
-    std::string buffer(static_cast<size_t>(count), '\0');
-    size_t got = count > 0 ? std::fread(&buffer[0], 1, static_cast<size_t>(count), file->handle) : 0;
-    lua_pushlstring(L, buffer.data(), got);
-    lua_pushinteger(L, static_cast<lua_Integer>(got));
+    lua_pushlstring(L, reinterpret_cast<const char *>(file->data.data()) + file->position, static_cast<size_t>(count));
+    file->position += static_cast<size_t>(count);
+    lua_pushinteger(L, static_cast<lua_Integer>(count));
     return 2;
 }
 
@@ -526,22 +599,47 @@ int file_flush(lua_State *L)
 int file_seek(lua_State *L)
 {
     File *file = checkFile(L, 1);
-    long pos = static_cast<long>(luaL_checkinteger(L, 2));
-    lua_pushboolean(L, file->handle != nullptr && std::fseek(file->handle, pos, SEEK_SET) == 0);
+    long long pos = static_cast<long long>(luaL_checkinteger(L, 2));
+    if (file->mode == 'r')
+    {
+        bool ok = pos >= 0 && pos <= static_cast<long long>(file->data.size());
+        if (ok)
+        {
+            file->position = static_cast<size_t>(pos);
+        }
+        lua_pushboolean(L, ok);
+        return 1;
+    }
+    lua_pushboolean(L, file->handle != nullptr && std::fseek(file->handle, static_cast<long>(pos), SEEK_SET) == 0);
     return 1;
 }
 
 int file_tell(lua_State *L)
 {
     File *file = checkFile(L, 1);
-    lua_pushinteger(L, file->handle != nullptr ? std::ftell(file->handle) : -1);
+    if (file->mode == 'r')
+    {
+        lua_pushinteger(L, static_cast<lua_Integer>(file->position));
+    }
+    else
+    {
+        lua_pushinteger(L, file->handle != nullptr ? std::ftell(file->handle) : -1);
+    }
     return 1;
 }
 
 int file_isEOF(lua_State *L)
 {
     File *file = checkFile(L, 1);
-    bool eof = file->handle == nullptr || std::ftell(file->handle) >= fileSize(*file);
+    bool eof = true;
+    if (file->mode == 'r')
+    {
+        eof = file->position >= file->data.size();
+    }
+    else if (file->handle != nullptr)
+    {
+        eof = std::ftell(file->handle) >= fileSize(*file);
+    }
     lua_pushboolean(L, eof);
     return 1;
 }
@@ -549,23 +647,11 @@ int file_isEOF(lua_State *L)
 int file_lines_iterator(lua_State *L)
 {
     File *file = checkFile(L, lua_upvalueindex(1));
-    if (file->handle == nullptr)
+    if (file->mode != 'r')
     {
         return 0;
     }
-    std::string line;
-    int c;
-    bool any = false;
-    while ((c = std::fgetc(file->handle)) != EOF)
-    {
-        any = true;
-        if (c == '\n')
-        {
-            break;
-        }
-        line.push_back(static_cast<char>(c));
-    }
-    if (!any)
+    if (file->position >= file->data.size())
     {
         if (lua_toboolean(L, lua_upvalueindex(2)))
         {
@@ -573,11 +659,16 @@ int file_lines_iterator(lua_State *L)
         }
         return 0;
     }
-    if (!line.empty() && line.back() == '\r')
+    const char *begin = reinterpret_cast<const char *>(file->data.data()) + file->position;
+    size_t available = file->data.size() - file->position;
+    const char *newline = static_cast<const char *>(std::memchr(begin, '\n', available));
+    size_t length = newline != nullptr ? static_cast<size_t>(newline - begin) : available;
+    file->position += length + (newline != nullptr ? 1 : 0);
+    if (length > 0 && begin[length - 1] == '\r')
     {
-        line.pop_back();
+        --length;
     }
-    lua_pushlstring(L, line.data(), line.size());
+    lua_pushlstring(L, begin, length);
     return 1;
 }
 
@@ -585,7 +676,7 @@ int file_lines(lua_State *L)
 {
     File *file = checkFile(L, 1);
     bool autoClose = false;
-    if (file->handle == nullptr)
+    if (!file->isOpen())
     {
         std::string err;
         if (!openFile(*file, 'r', err))
@@ -678,9 +769,39 @@ const luaL_Reg FILEDATA_METHODS[] = {
 // love.filesystem.*
 // ---------------------------------------------------------------------------
 
+std::string realExecutable()
+{
+#if defined(__linux__)
+    char buffer[4096];
+    ssize_t length = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+    if (length > 0)
+    {
+        buffer[length] = '\0';
+        return buffer;
+    }
+#elif defined(_WIN32)
+    char buffer[4096];
+    unsigned long length = GetModuleFileNameA(nullptr, buffer, sizeof(buffer));
+    if (length > 0 && length < sizeof(buffer))
+    {
+        return normalize(std::string(buffer, length));
+    }
+#endif
+    return g_executable;
+}
+
 int l_init(lua_State *L)
 {
     g_executable = normalize(luaL_checkstring(L, 1));
+    std::string real = realExecutable();
+    if (vfs::mountFused(real))
+    {
+        g_fused = true;
+        g_sourceIsArchive = true;
+        g_source = real;
+        g_watched.clear();
+        g_watched.push_back({real, modTimeOf(real)});
+    }
     return 0;
 }
 
@@ -743,7 +864,7 @@ int l_getAppdataDirectory(lua_State *L)
 
 int l_getExecutablePath(lua_State *L)
 {
-    lua_pushstring(L, g_executable.c_str());
+    lua_pushstring(L, realExecutable().c_str());
     return 1;
 }
 
@@ -761,10 +882,10 @@ int l_getRealDirectory(lua_State *L)
         lua_pushstring(L, getSaveDirectory().c_str());
         return 1;
     }
-    std::string source = g_source.empty() ? std::string(".") : g_source;
-    if (infoOf(join(source, path)).exists)
+    std::string origin = vfs::origin(path);
+    if (!origin.empty())
     {
-        lua_pushstring(L, source.c_str());
+        lua_pushstring(L, origin.c_str());
         return 1;
     }
     lua_pushnil(L);
@@ -791,7 +912,7 @@ int l_getInfo(lua_State *L)
         tableIndex = 2;
     }
 
-    Info info = infoOf(resolveRead(path));
+    Info info = infoVirtual(path);
     if (!info.exists || (filter != nullptr && std::strcmp(filter, info.type) != 0))
     {
         lua_pushnil(L);
@@ -844,10 +965,18 @@ int l_read(lua_State *L)
     }
     const char *name = luaL_checkstring(L, nameIndex);
     std::vector<unsigned char> data;
-    if (!readFile(name, data))
+    std::string error;
+    if (!readFile(name, data, &error))
     {
         lua_pushnil(L);
-        lua_pushfstring(L, "Could not open file %s. Does not exist.", name);
+        if (error.empty() || error == "Does not exist")
+        {
+            lua_pushfstring(L, "Could not open file %s. Does not exist.", name);
+        }
+        else
+        {
+            lua_pushfstring(L, "Could not read file %s: %s", name, error.c_str());
+        }
         return 2;
     }
     size_t size = data.size();
@@ -958,47 +1087,28 @@ int l_getDirectoryItems(lua_State *L)
     {
         return 1;
     }
-    std::vector<std::string> roots;
+    std::vector<std::string> names;
     if (!g_identity.empty())
     {
-        roots.push_back(join(getSaveDirectory(), path));
-    }
-    roots.push_back(join(g_source.empty() ? std::string(".") : g_source, path));
-
-    // Items present in both locations are reported once.
-    lua_newtable(L); // seen set
-    int n = 0;
-    for (const std::string &root : roots)
-    {
         std::error_code ec;
-        if (!fs::is_directory(root, ec))
+        std::string saved = join(getSaveDirectory(), path);
+        if (fs::is_directory(saved, ec))
         {
-            continue;
-        }
-        for (const auto &entry : fs::directory_iterator(root, ec))
-        {
-            std::string name = entry.path().filename().string();
-            lua_getfield(L, -1, name.c_str());
-            bool seen = !lua_isnil(L, -1);
-            lua_pop(L, 1);
-            if (seen)
+            for (const auto &entry : fs::directory_iterator(saved, ec))
             {
-                continue;
+                names.push_back(entry.path().filename().string());
             }
-            lua_pushboolean(L, 1);
-            lua_setfield(L, -2, name.c_str());
-            lua_pushstring(L, name.c_str());
-            lua_rawseti(L, -3, ++n);
         }
     }
-    lua_pop(L, 1);
-
-    // Stable, deterministic order.
-    lua_getglobal(L, "table");
-    lua_getfield(L, -1, "sort");
-    lua_pushvalue(L, -3);
-    lua_call(L, 1, 0);
-    lua_pop(L, 1);
+    vfs::list(path, names);
+    std::sort(names.begin(), names.end());
+    names.erase(std::unique(names.begin(), names.end()), names.end());
+    int n = 0;
+    for (const std::string &name : names)
+    {
+        lua_pushstring(L, name.c_str());
+        lua_rawseti(L, -2, ++n);
+    }
     return 1;
 }
 
@@ -1045,43 +1155,109 @@ int l_load(lua_State *L)
 
 int l_exists(lua_State *L)
 {
-    lua_pushboolean(L, infoOf(resolveRead(luaL_checkstring(L, 1))).exists);
+    lua_pushboolean(L, infoVirtual(luaL_checkstring(L, 1)).exists);
     return 1;
 }
 
 int l_isFile(lua_State *L)
 {
-    Info info = infoOf(resolveRead(luaL_checkstring(L, 1)));
+    Info info = infoVirtual(luaL_checkstring(L, 1));
     lua_pushboolean(L, info.exists && std::strcmp(info.type, "file") == 0);
     return 1;
 }
 
 int l_isDirectory(lua_State *L)
 {
-    Info info = infoOf(resolveRead(luaL_checkstring(L, 1)));
+    Info info = infoVirtual(luaL_checkstring(L, 1));
     lua_pushboolean(L, info.exists && std::strcmp(info.type, "directory") == 0);
     return 1;
 }
 
 int l_isFused(lua_State *L)
 {
-    lua_pushboolean(L, 0);
+    lua_pushboolean(L, g_fused);
     return 1;
 }
 
+bool mountPath(const std::string &given, const std::string &point, bool append, std::string &error)
+{
+    std::string clean = normalize(given);
+    if (isSafeRelative(clean) && !clean.empty())
+    {
+        std::string saved = g_identity.empty() ? std::string() : join(getSaveDirectory(), clean);
+        Info info = saved.empty() ? Info() : infoOf(saved);
+        if (info.exists)
+        {
+            return std::strcmp(info.type, "directory") == 0 ? vfs::mountDirectory(saved, point, append, error)
+                                                             : vfs::mountArchiveFile(saved, point, append, error);
+        }
+        vfs::Stat stat = vfs::stat(clean);
+        if (stat.exists && stat.isDirectory)
+        {
+            std::string real = vfs::realFile(clean);
+            if (!real.empty())
+            {
+                return vfs::mountDirectory(real, point, append, error);
+            }
+        }
+        else if (stat.exists)
+        {
+            std::vector<unsigned char> bytes;
+            std::string readError;
+            if (vfs::readFile(clean, bytes, &readError))
+            {
+                return vfs::mountArchiveMemory(std::move(bytes), clean, point, append, error);
+            }
+        }
+    }
+    Info host = infoOf(normalize(given));
+    if (host.exists)
+    {
+        return std::strcmp(host.type, "directory") == 0 ? vfs::mountDirectory(normalize(given), point, append, error)
+                                                         : vfs::mountArchiveFile(normalize(given), point, append, error);
+    }
+    error = "Could not open " + given + ". Does not exist.";
+    return false;
+}
+
+// mount(archive, mountpoint [, appendToPath]) | mount(filedata, name, mountpoint [, appendToPath])
 int l_mount(lua_State *L)
 {
-    // Archives are not supported yet; directories inside the source already
-    // are visible, so mounting them is a no-op that reports success.
-    std::string archive = normalize(luaL_checkstring(L, 1));
-    Info info = infoOf(archive);
-    lua_pushboolean(L, info.exists && std::strcmp(info.type, "directory") == 0);
-    return 1;
+    std::string error;
+    bool ok;
+    if (FileData *data = luax::testobject<FileData>(L, 1, FILEDATA_TYPE))
+    {
+        const char *name = luaL_checkstring(L, 2);
+        std::string point = luaL_optstring(L, 3, "/");
+        bool append = luax::optboolean(L, 4, false);
+        std::vector<unsigned char> bytes(data->contents.begin(), data->contents.end());
+        ok = vfs::mountArchiveMemory(std::move(bytes), name, point, append, error);
+    }
+    else
+    {
+        const char *archive = luaL_checkstring(L, 1);
+        std::string point = luaL_optstring(L, 2, "/");
+        bool append = luax::optboolean(L, 3, false);
+        ok = mountPath(archive, point, append, error);
+    }
+    lua_pushboolean(L, ok);
+    if (ok)
+    {
+        return 1;
+    }
+    lua_pushstring(L, error.c_str());
+    return 2;
 }
 
 int l_unmount(lua_State *L)
 {
-    lua_pushboolean(L, 1);
+    std::string name = luaL_checkstring(L, 1);
+    bool ok = vfs::unmount(name) || vfs::unmount(normalize(name));
+    if (!ok && !g_identity.empty())
+    {
+        ok = vfs::unmount(join(getSaveDirectory(), normalize(name)));
+    }
+    lua_pushboolean(L, ok);
     return 1;
 }
 

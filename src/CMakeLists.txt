@@ -5,6 +5,7 @@ set(LOVERAY_SOURCES
     resources.cpp
     love.cpp
     filesystem.cpp
+    vfs.cpp
     window.cpp
     graphics.cpp
     graphics_objects.cpp

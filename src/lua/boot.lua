@@ -263,7 +263,12 @@ function love.boot()
     -- Load the no-game screen first so love.nogame exists even for errors.
     love.nogame = love._loadResource("nogame.lua")()
 
-    love.arg.parseOptions(arg)
+    love.filesystem.init(arg[0] or "love")
+    local fused = love.filesystem.isFused()
+
+    if not fused then
+        love.arg.parseOptions(arg)
+    end
     local o = love.arg.options
 
     if o.version.set then
@@ -276,29 +281,31 @@ function love.boot()
         return 0
     end
 
-    love.filesystem.init(arg[0] or "love")
-
     local gamePath = o.game.arg and o.game.arg[1]
     local hasGame = false
     local identity = ""
 
-    if gamePath and gamePath ~= "" then
+    if fused then
+        hasGame = love.filesystem.getInfo("main.lua", "file") ~= nil
+        identity = love.path.leaf(love.filesystem.getExecutablePath()):gsub("%.exe$", "")
+    elseif gamePath and gamePath ~= "" then
         local full = love.path.getFull(gamePath)
         local info = love.filesystem.getRealInfo(full)
-        if info and info.type == "file" then
+        local isArchive = info and info.type == "file" and full:lower():match("%.love$") or full:lower():match("%.zip$")
+        if info and info.type == "file" and not isArchive then
             -- `love path/to/main.lua` is accepted as a convenience.
             full = full:match("^(.*)/[^/]*$") or "."
             info = love.filesystem.getRealInfo(full)
         end
-        if not info or info.type ~= "directory" then
-            error("Cannot open game directory '" .. gamePath .. "'")
+        if not info or (info.type ~= "directory" and not isArchive) then
+            error("Cannot open game '" .. gamePath .. "'")
         end
         love.filesystem.setSource(full)
         hasGame = love.filesystem.getInfo("main.lua", "file") ~= nil
         if not hasGame and not love.filesystem.getInfo("conf.lua", "file") then
             print("No main.lua found in '" .. full .. "'")
         end
-        identity = love.path.leaf(full)
+        identity = love.path.leaf(full):gsub("%.love$", ""):gsub("%.zip$", "")
     end
 
     -- Default configuration, identical to Love2D 11.

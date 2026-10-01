@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
 
 namespace love
 {
@@ -582,19 +583,23 @@ int l_setIcon(lua_State *L)
     // Accepts an ImageData (love.image) or a file path.
     if (lua_type(L, 1) == LUA_TSTRING)
     {
-        std::string real = filesystem::resolveRead(lua_tostring(L, 1));
-        if (real.empty())
+        std::string path = lua_tostring(L, 1);
+        std::vector<unsigned char> bytes;
+        if (!filesystem::readFile(path, bytes))
         {
             lua_pushboolean(L, 0);
             return 1;
         }
-        Image image = LoadImage(real.c_str());
-        if (image.data != nullptr && g_state.open)
+        size_t dot = path.find_last_of('.');
+        std::string extension = dot == std::string::npos ? ".png" : path.substr(dot);
+        Image image = LoadImageFromMemory(extension.c_str(), bytes.data(), static_cast<int>(bytes.size()));
+        bool loaded = image.data != nullptr;
+        if (loaded && g_state.open)
         {
             SetWindowIcon(image);
         }
         UnloadImage(image);
-        lua_pushboolean(L, image.data != nullptr);
+        lua_pushboolean(L, loaded);
         return 1;
     }
     Image *image = luax::checkobject<Image>(L, 1, "ImageData");
