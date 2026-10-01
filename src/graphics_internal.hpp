@@ -24,6 +24,7 @@ constexpr const char *SPRITEBATCH_TYPE = "SpriteBatch";
 constexpr const char *TEXT_TYPE = "Text";
 constexpr const char *SHADER_TYPE = "Shader";
 constexpr const char *PARTICLES_TYPE = "ParticleSystem";
+constexpr const char *MESH_TYPE = "Mesh";
 
 // Filter / wrap names shared with love.image.
 int textureFilterFromNames(const std::string &min, const std::string &mag);
@@ -174,6 +175,15 @@ struct ParticleSystemObj;
 void drawParticleSystem(lua_State *L, ParticleSystemObj &system, const Matrix &transform);
 void registerParticleType(lua_State *L);
 extern const luaL_Reg PARTICLE_FUNCS[];
+
+// Meshes -----------------------------------------------------------------------
+
+struct MeshObj;
+
+void drawMesh(lua_State *L, MeshObj &mesh, const Matrix &transform);
+void registerMeshType(lua_State *L);
+extern const luaL_Reg MESH_FUNCS[];
+float currentPointSize();
 
 // Registration ---------------------------------------------------------------
 

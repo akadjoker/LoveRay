@@ -354,6 +354,11 @@ Color currentColor()
     return g_state.color;
 }
 
+float currentPointSize()
+{
+    return g_state.pointSize;
+}
+
 const std::string &defaultFilterMin()
 {
     return g_defaultFilterMin;
@@ -1550,6 +1555,11 @@ int l_draw(lua_State *L)
         drawParticleSystem(L, *particles, readTransformArgs(L, 2));
         return 0;
     }
+    if (MeshObj *mesh = luax::testobject<MeshObj>(L, 1, MESH_TYPE))
+    {
+        drawMesh(L, *mesh, readTransformArgs(L, 2));
+        return 0;
+    }
 
     DrawSource src = checkDrawSource(L, 1);
     int argIndex = 2;
@@ -2052,7 +2062,8 @@ int open_graphics(lua_State *L)
 
     luaL_setfuncs(L, SHADER_FUNCS, 0);
     luaL_setfuncs(L, PARTICLE_FUNCS, 0);
-    const char *unsupported[] = {"newMesh", "newVideo", "newArrayImage", "newCubeImage",
+    luaL_setfuncs(L, MESH_FUNCS, 0);
+    const char *unsupported[] = {"newVideo", "newArrayImage", "newCubeImage",
                                  "newVolumeImage"};
     for (const char *name : unsupported)
     {

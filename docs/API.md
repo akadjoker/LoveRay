@@ -37,8 +37,9 @@ Legend: **full** works as documented, **partial** works with the listed limits, 
 | SpriteBatch | partial | `add`, `set`, `clear`, colors, draw range. No attached vertex attributes |
 | Shaders | partial | `newShader`, `setShader`, `getShader`, `validateShader`, `Shader:send`, `sendColor`, `hasUniform`. See below |
 | ParticleSystem | full | `newParticleSystem` with every setter and getter of Love2D 11.5: emission, lifetime, speed, direction, spread, linear/radial/tangential acceleration, damping, spin, rotation, sizes, colors, quads, offset, emission areas, insert modes, `moveTo`, `clone` |
+| Mesh | partial | `newMesh` with `fan`, `strip`, `triangles` and `points` modes, vertex map, draw range, texture (Image or Canvas), `setVertex`, `setVertices`, `getVertex`, vertex attributes by index, drawn through shaders and transforms. Only the standard attributes exist (position, texture coordinate, color), custom vertex formats raise an error |
 | Stencil | full | `stencil` with all six actions and `keepvalues`, `setStencilTest`/`getStencilTest` with every compare mode, `clear` resets the stencil buffer, `push("all")` saves the test. Every Canvas and the window have an 8-bit stencil buffer |
-| Mesh, Video, array/cube/volume images | missing | `newMesh` and friends raise "not supported by LoveRay yet" |
+| Video, array/cube/volume images | missing | `newMesh` and friends raise "not supported by LoveRay yet" |
 
 ### Shaders
 

@@ -1864,6 +1864,7 @@ void registerObjectTypes(lua_State *L)
     luax::newtype(L, TEXT_TYPE, TEXT_METHODS, text_gc);
     registerShaderType(L);
     registerParticleType(L);
+    registerMeshType(L);
 }
 
 void shutdownObjects()
