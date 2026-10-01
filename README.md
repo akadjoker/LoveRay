@@ -8,11 +8,13 @@ Write a game with the Love2D API, run it with `love <game directory>` on Linux, 
 
 ## Status
 
-LoveRay implements the core of the Love2D API: `love.run` and the callback loop, `conf.lua`, `love.filesystem` with a save directory, `love.graphics` (shapes, text, images, quads, canvases, sprite batches, shaders, blend modes, scissor, transforms), `love.keyboard`, `love.mouse`, `love.joystick`, `love.audio`, `love.math`, `love.image`, `love.window`, `love.timer`, `love.event` and `love.physics` with every Box2D joint type.
+LoveRay implements the core of the Love2D API: `love.run` and the callback loop, `conf.lua`, `love.filesystem` with a save directory, `love.graphics` (shapes, text, images, quads, canvases, sprite batches, shaders, particle systems, blend modes, scissor, transforms), `love.keyboard`, `love.mouse`, `love.joystick`, `love.audio`, `love.math`, `love.image`, `love.window`, `love.timer`, `love.event` and `love.physics` with every Box2D joint type.
 
 Shaders are supported through `love.graphics.newShader` with Love's GLSL dialect (`effect` and `position`), including uniforms, extra textures and post-processing through canvases.
 
-Not implemented yet: meshes, particle systems, video, threads, `love.data`, `love.sound`, `love.font` and `love.touch`. See [docs/API.md](docs/API.md) for the function-level status and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
+Particle systems implement the full `ParticleSystem` API.
+
+Not implemented yet: meshes, video, threads, `love.data`, `love.sound`, `love.font` and `love.touch`. See [docs/API.md](docs/API.md) for the function-level status and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
 
 ## Quick start
 
@@ -78,6 +80,7 @@ Errors show the usual blue screen with a traceback. Press `R` to restart or `Esc
 | `examples/input` | every input callback |
 | `examples/canvas` | offscreen rendering, blend modes, scissor |
 | `examples/physics` | bodies, joints, contacts, mouse dragging, a wheeled car |
+| `examples/particles` | fire, smoke, fountain, bursts and snow, `love examples/particles snow` picks one |
 | `examples/shader` | post-processing effects (grayscale, wave, vignette, pixelate, chromatic), `love examples/shader wave` picks one |
 
 ## Web build

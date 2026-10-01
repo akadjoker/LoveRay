@@ -23,6 +23,7 @@ constexpr const char *FONT_TYPE = "Font";
 constexpr const char *SPRITEBATCH_TYPE = "SpriteBatch";
 constexpr const char *TEXT_TYPE = "Text";
 constexpr const char *SHADER_TYPE = "Shader";
+constexpr const char *PARTICLES_TYPE = "ParticleSystem";
 
 // Filter / wrap names shared with love.image.
 int textureFilterFromNames(const std::string &min, const std::string &mag);
@@ -164,6 +165,15 @@ void shaderBeforeDraw(ShaderObj *shader);
 void shaderSetTargetSize(ShaderObj *shader, int width, int height);
 void registerShaderType(lua_State *L);
 extern const luaL_Reg SHADER_FUNCS[];
+
+// Particles --------------------------------------------------------------------
+
+struct ParticleSystemObj;
+
+// Draws every live particle through `transform`; the texture is read from the system.
+void drawParticleSystem(lua_State *L, ParticleSystemObj &system, const Matrix &transform);
+void registerParticleType(lua_State *L);
+extern const luaL_Reg PARTICLE_FUNCS[];
 
 // Registration ---------------------------------------------------------------
 

@@ -1494,6 +1494,11 @@ int l_draw(lua_State *L)
         drawTextObject(L, *text, readTransformArgs(L, 2));
         return 0;
     }
+    if (ParticleSystemObj *particles = luax::testobject<ParticleSystemObj>(L, 1, PARTICLES_TYPE))
+    {
+        drawParticleSystem(L, *particles, readTransformArgs(L, 2));
+        return 0;
+    }
 
     DrawSource src = checkDrawSource(L, 1);
     int argIndex = 2;
@@ -1943,7 +1948,8 @@ int open_graphics(lua_State *L)
     luaL_setfuncs(L, OBJECT_FUNCS, 0);
 
     luaL_setfuncs(L, SHADER_FUNCS, 0);
-    const char *unsupported[] = {"newMesh", "newParticleSystem", "newVideo", "newArrayImage", "newCubeImage",
+    luaL_setfuncs(L, PARTICLE_FUNCS, 0);
+    const char *unsupported[] = {"newMesh", "newVideo", "newArrayImage", "newCubeImage",
                                  "newVolumeImage"};
     for (const char *name : unsupported)
     {

@@ -29,6 +29,7 @@ run "version" --version
 run "api tests" "$ROOT/tests/api" --frames 10
 run "physics tests" "$ROOT/tests/physics" --frames 10
 run "shader tests" "$ROOT/tests/shader" --frames 10
+run "particle tests" "$ROOT/tests/particles" --frames 10
 
 for example in "$ROOT"/examples/*/; do
     name="$(basename "$example")"

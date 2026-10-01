@@ -9,6 +9,7 @@ set(LOVERAY_SOURCES
     graphics.cpp
     graphics_objects.cpp
     shader.cpp
+    particles.cpp
     event.cpp
     keyboard.cpp
     mouse.cpp

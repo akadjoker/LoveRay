@@ -1859,6 +1859,7 @@ void registerObjectTypes(lua_State *L)
     luax::newtype(L, SPRITEBATCH_TYPE, SPRITEBATCH_METHODS, batch_gc);
     luax::newtype(L, TEXT_TYPE, TEXT_METHODS, text_gc);
     registerShaderType(L);
+    registerParticleType(L);
 }
 
 void shutdownObjects()
