@@ -1,0 +1,23 @@
+# Build output
+build/
+build-*/
+cmake-build-*/
+out/
+*.o
+*.a
+*.so
+*.dll
+*.dylib
+*.exe
+bin/
+
+# Test output
+tests/out/
+*.log
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
