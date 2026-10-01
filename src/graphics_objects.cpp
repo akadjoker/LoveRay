@@ -1858,6 +1858,7 @@ void registerObjectTypes(lua_State *L)
     luax::newtype(L, FONT_TYPE, FONT_METHODS, luax::gcobject<FontObj>);
     luax::newtype(L, SPRITEBATCH_TYPE, SPRITEBATCH_METHODS, batch_gc);
     luax::newtype(L, TEXT_TYPE, TEXT_METHODS, text_gc);
+    registerShaderType(L);
 }
 
 void shutdownObjects()

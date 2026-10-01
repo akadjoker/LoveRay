@@ -8,9 +8,11 @@ Write a game with the Love2D API, run it with `love <game directory>` on Linux, 
 
 ## Status
 
-LoveRay implements the core of the Love2D API: `love.run` and the callback loop, `conf.lua`, `love.filesystem` with a save directory, `love.graphics` (shapes, text, images, quads, canvases, sprite batches, blend modes, scissor, transforms), `love.keyboard`, `love.mouse`, `love.joystick`, `love.audio`, `love.math`, `love.image`, `love.window`, `love.timer`, `love.event` and `love.physics` with every Box2D joint type.
+LoveRay implements the core of the Love2D API: `love.run` and the callback loop, `conf.lua`, `love.filesystem` with a save directory, `love.graphics` (shapes, text, images, quads, canvases, sprite batches, shaders, blend modes, scissor, transforms), `love.keyboard`, `love.mouse`, `love.joystick`, `love.audio`, `love.math`, `love.image`, `love.window`, `love.timer`, `love.event` and `love.physics` with every Box2D joint type.
 
-Not implemented yet: shaders, meshes, particle systems, video, threads, `love.data`, `love.sound`, `love.font` and `love.touch`. See [docs/API.md](docs/API.md) for the function-level status and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
+Shaders are supported through `love.graphics.newShader` with Love's GLSL dialect (`effect` and `position`), including uniforms, extra textures and post-processing through canvases.
+
+Not implemented yet: meshes, particle systems, video, threads, `love.data`, `love.sound`, `love.font` and `love.touch`. See [docs/API.md](docs/API.md) for the function-level status and [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
 
 ## Quick start
 
@@ -76,6 +78,7 @@ Errors show the usual blue screen with a traceback. Press `R` to restart or `Esc
 | `examples/input` | every input callback |
 | `examples/canvas` | offscreen rendering, blend modes, scissor |
 | `examples/physics` | bodies, joints, contacts, mouse dragging, a wheeled car |
+| `examples/shader` | post-processing effects (grayscale, wave, vignette, pixelate, chromatic), `love examples/shader wave` picks one |
 
 ## Web build
 
@@ -91,7 +94,7 @@ This produces `bin/love.html`, `love.js`, `love.wasm` and `love.data`. Serve the
 ## Differences from Love2D
 
 - Fonts are rasterized from TrueType files at load time. The built-in font is DejaVu Sans.
-- Stencils, shaders and depth buffers do not exist yet, the matching functions are no-ops or raise a clear error.
+- Shaders target GLSL 3.30 on desktop and GLSL ES 1.00 in the browser. Stencils and depth buffers do not exist yet, the matching functions are no-ops.
 - `love.physics` uses Box2D 2.4, so joint stiffness is expressed through frequency and damping ratio helpers that map onto it.
 - `love.filesystem` reads from the game folder and the save directory but cannot mount archives or `.love` files.
 - `Source:queue`, audio effects and custom image cursors are not available.

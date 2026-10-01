@@ -8,6 +8,7 @@ set(LOVERAY_SOURCES
     window.cpp
     graphics.cpp
     graphics_objects.cpp
+    shader.cpp
     event.cpp
     keyboard.cpp
     mouse.cpp

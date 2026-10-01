@@ -50,9 +50,11 @@ struct State
     bool wireframe = false;
     luax::Ref font;
     luax::Ref canvas;
+    luax::Ref shader;
 };
 
 State g_state;
+ShaderObj *g_shader = nullptr;
 std::vector<State *> g_stateStack; // snapshots for push("all")
 std::vector<bool> g_pushKinds;     // true = "all"
 std::string g_defaultFilterMin = "linear";
@@ -209,6 +211,18 @@ CanvasObj *activeCanvas(lua_State *L)
     return canvas;
 }
 
+void currentTargetSize(lua_State *L, int &width, int &height)
+{
+    if (CanvasObj *canvas = activeCanvas(L))
+    {
+        width = canvas->target.texture.width;
+        height = canvas->target.texture.height;
+        return;
+    }
+    width = GetScreenWidth();
+    height = GetScreenHeight();
+}
+
 void performScreenshot()
 {
     if (!g_screenshotPending)
@@ -256,6 +270,10 @@ void ensureFrame()
 {
     if (g_frameActive)
     {
+        if (g_shader != nullptr)
+        {
+            shaderBeforeDraw(g_shader);
+        }
         return;
     }
     window::ensureOpen();
@@ -264,6 +282,10 @@ void ensureFrame()
     g_pushKinds.clear();
     applyBlendMode();
     applyScissor();
+    if (g_shader != nullptr)
+    {
+        shaderActivate(g_shader, GetScreenWidth(), GetScreenHeight());
+    }
     if (g_state.wireframe)
     {
         rlEnableWireMode();
@@ -398,6 +420,7 @@ void shutdown()
     g_stateStack.clear();
     g_pushKinds.clear();
     g_state = State();
+    g_shader = nullptr;
     g_frameActive = false;
     g_screenshotPending = false;
     g_screenshotState = nullptr;
@@ -856,9 +879,14 @@ int l_reset(lua_State *L)
     }
     g_state.canvas.clear(L);
     g_state.font.clear(L);
+    g_state.shader.clear(L);
     if (g_frameActive)
     {
         EndTextureMode();
+        if (g_shader != nullptr)
+        {
+            shaderDeactivate();
+        }
         applyBlendMode();
         applyScissor();
         rlColorMask(true, true, true, true);
@@ -870,6 +898,7 @@ int l_reset(lua_State *L)
         }
         rlLoadIdentity();
     }
+    g_shader = nullptr;
     return 0;
 }
 
@@ -1019,12 +1048,16 @@ int l_push(lua_State *L)
         g_state.canvas.push(L);
         snapshot->canvas.set(L, -1);
         lua_pop(L, 1);
+        g_state.shader.push(L);
+        snapshot->shader.set(L, -1);
+        lua_pop(L, 1);
         g_stateStack.push_back(snapshot);
     }
     return 0;
 }
 
 int setCanvasImpl(lua_State *L, int idx);
+int setShaderImpl(lua_State *L, int idx);
 
 int l_pop(lua_State *L)
 {
@@ -1064,8 +1097,12 @@ int l_pop(lua_State *L)
         snapshot->canvas.push(L);
         setCanvasImpl(L, lua_gettop(L));
         lua_pop(L, 1);
+        snapshot->shader.push(L);
+        setShaderImpl(L, lua_gettop(L));
+        lua_pop(L, 1);
         snapshot->font.clear(L);
         snapshot->canvas.clear(L);
+        snapshot->shader.clear(L);
         delete snapshot;
         applyBlendMode();
         applyScissor();
@@ -1585,7 +1622,47 @@ int setCanvasImpl(lua_State *L, int idx)
     }
     rlSetMatrixModelview(modelview);
     applyScissor();
+    if (g_shader != nullptr)
+    {
+        int width, height;
+        currentTargetSize(L, width, height);
+        shaderSetTargetSize(g_shader, width, height);
+    }
     return 0;
+}
+
+int setShaderImpl(lua_State *L, int idx)
+{
+    ensureFrame();
+    ShaderObj *next = lua_isnoneornil(L, idx) ? nullptr : checkShader(L, idx);
+    if (next == g_shader)
+    {
+        return 0;
+    }
+    if (next == nullptr)
+    {
+        shaderDeactivate();
+        g_shader = nullptr;
+        g_state.shader.clear(L);
+        return 0;
+    }
+    int width, height;
+    currentTargetSize(L, width, height);
+    shaderActivate(next, width, height);
+    g_shader = next;
+    g_state.shader.set(L, idx);
+    return 0;
+}
+
+int l_setShader(lua_State *L)
+{
+    return setShaderImpl(L, 1);
+}
+
+int l_getShader(lua_State *L)
+{
+    g_state.shader.push(L);
+    return 1;
 }
 
 int l_setCanvas(lua_State *L)
@@ -1765,12 +1842,6 @@ int l_getFrontFaceWinding(lua_State *L)
     return 1;
 }
 
-int l_getShader(lua_State *L)
-{
-    lua_pushnil(L);
-    return 1;
-}
-
 const luaL_Reg FUNCS[] = {
     // state
     {"setColor", l_setColor},
@@ -1855,7 +1926,7 @@ const luaL_Reg FUNCS[] = {
     {"getMeshCullMode", l_getMeshCullMode},
     {"setFrontFaceWinding", l_noop},
     {"getFrontFaceWinding", l_getFrontFaceWinding},
-    {"setShader", l_noop},
+    {"setShader", l_setShader},
     {"getShader", l_getShader},
     {"flushBatch", l_noop},
     {nullptr, nullptr},
@@ -1871,8 +1942,9 @@ int open_graphics(lua_State *L)
     luaL_newlib(L, FUNCS);
     luaL_setfuncs(L, OBJECT_FUNCS, 0);
 
-    const char *unsupported[] = {"newShader", "newMesh", "newParticleSystem", "newVideo", "newArrayImage",
-                                 "newCubeImage", "newVolumeImage", "validateShader"};
+    luaL_setfuncs(L, SHADER_FUNCS, 0);
+    const char *unsupported[] = {"newMesh", "newParticleSystem", "newVideo", "newArrayImage", "newCubeImage",
+                                 "newVolumeImage"};
     for (const char *name : unsupported)
     {
         lua_pushstring(L, name);

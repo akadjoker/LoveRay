@@ -123,32 +123,13 @@ function love.arg.parseOptions(arg)
     end
 end
 
--- Returns the arguments meant for the game (everything after the game path).
+-- Returns the arguments meant for the game: everything that is neither a
+-- runtime option nor the game path itself.
 function love.arg.parseGameArguments(a)
     local out = {}
-    local gameArgIndex = 0
-    for i, v in ipairs(a) do
-        if love.arg.optionIndices[i] then
-            -- skip runtime options
-        elseif gameArgIndex == 0 and i >= (love.arg.options.game.arg and love.arg.options.game.arg[1] and 1 or 1) then
-            gameArgIndex = i
-        end
-    end
-    -- Game arguments are everything after the game path itself.
-    local firstGame
-    for i, v in ipairs(a) do
+    for i = 1, #a do
         if not love.arg.optionIndices[i] then
-            firstGame = i
-            break
-        end
-    end
-    if firstGame then
-        local n = 1
-        for i = firstGame + 1, #a do
-            if not love.arg.optionIndices[i] then
-                out[n] = a[i]
-                n = n + 1
-            end
+            out[#out + 1] = a[i]
         end
     end
     return out

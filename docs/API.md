@@ -35,8 +35,20 @@ Legend: **full** works as documented, **partial** works with the listed limits, 
 | Images | full | `Image`, `Quad`, filters, wrap modes, mipmaps, `ImageData` input |
 | Canvas | partial | `Canvas` objects, `setCanvas`, `renderTo`, `newImageData`. A single render target, no MSAA |
 | SpriteBatch | partial | `add`, `set`, `clear`, colors, draw range. No attached vertex attributes |
+| Shaders | partial | `newShader`, `setShader`, `getShader`, `validateShader`, `Shader:send`, `sendColor`, `hasUniform`. See below |
 | Stencil | stub | `stencil` runs its function, `setStencilTest` does nothing |
-| Shaders, Mesh, ParticleSystem, Video, array/cube/volume images | missing | `newShader` and friends raise "not supported by LoveRay yet" |
+| Mesh, ParticleSystem, Video, array/cube/volume images | missing | `newMesh` and friends raise "not supported by LoveRay yet" |
+
+### Shaders
+
+Write shaders exactly as for Love2D: `vec4 effect(vec4 color, Image tex, vec2 texture_coords, vec2 screen_coords)` and `vec4 position(mat4 transform_projection, vec4 vertex_position)`, in one string or as separate pixel and vertex code. Code is translated to GLSL 3.30 on desktop and GLSL ES 1.00 in the browser.
+
+- Available keywords and names: `extern`, `number`, `Image`, `Texel`, `varying`, `VaryingTexCoord`, `VaryingColor`, `love_ScreenSize`.
+- `screen_coords` has its origin at the top left, also when drawing to a canvas.
+- Uniform types: `float`, `int`, `bool`, `vec2` to `vec4`, `ivec2` to `ivec4`, `mat4`, `Image` and arrays of the numeric types. `mat2` and `mat3` raise an error.
+- Compile errors are raised from `newShader` with the driver message and the line number of your code.
+- A Canvas sent as an extra texture is vertically flipped compared to Love2D. Drawing a Canvas through a shader is not affected.
+- Not available: multi-canvas output, vertex attributes beyond position, texcoord and color, `love_PixelCoord`, `Shader:getExternVariable`.
 
 ## Implemented functions
 
@@ -45,7 +57,7 @@ Generated from the binary with `love.<module>` tables, see `tests/api/main.lua` 
 - **audio**: getActiveEffects getActiveSourceCount getDistanceModel getDopplerScale getEffect getMaxSceneEffects getMaxSourceEffects getOrientation getPosition getRecordingDevices getSourceCount getVelocity getVolume isEffectsSupported newSource pause play setDistanceModel setDopplerScale setEffect setMixWithSystem setOrientation setPosition setVelocity setVolume stop
 - **event**: clear poll pump push quit wait
 - **filesystem**: append areSymlinksEnabled createDirectory exists getAppdataDirectory getCRequirePath getDirectoryItems getExecutablePath getIdentity getInfo getRealDirectory getRequirePath getSaveDirectory getSource getSourceBaseDirectory getUserDirectory getWorkingDirectory isDirectory isFile isFused lines load mount newFile newFileData read remove setCRequirePath setIdentity setRequirePath setSource setSymlinksEnabled unmount write
-- **graphics**: applyTransform arc captureScreenshot circle clear discard draw ellipse getBackgroundColor getBlendMode getCanvas getCanvasFormats getColor getColorMask getDPIScale getDefaultFilter getDimensions getFont getHeight getImageFormats getLineJoin getLineStyle getLineWidth getPixelDimensions getPixelHeight getPixelWidth getPointSize getRendererInfo getScissor getStats getSupported getSystemLimits getWidth intersectScissor inverseTransformPoint isActive isCreated isGammaCorrect isWireframe line newCanvas newFont newImage newQuad newSpriteBatch newText origin points polygon pop present print printf push rectangle replaceTransform reset rotate scale setBackgroundColor setBlendMode setCanvas setColor setColorMask setDefaultFilter setFont setLineJoin setLineStyle setLineWidth setNewFont setPointSize setScissor setWireframe shear stencil transformPoint translate
+- **graphics**: applyTransform arc captureScreenshot circle clear discard draw ellipse getBackgroundColor getBlendMode getCanvas getCanvasFormats getColor getColorMask getDPIScale getDefaultFilter getDimensions getFont getHeight getImageFormats getLineJoin getLineStyle getLineWidth getPixelDimensions getPixelHeight getPixelWidth getPointSize getRendererInfo getScissor getShader getStats getSupported getSystemLimits getWidth intersectScissor inverseTransformPoint isActive isCreated isGammaCorrect isWireframe line newCanvas newFont newImage newQuad newShader newSpriteBatch newText origin points polygon pop present print printf push rectangle replaceTransform reset rotate scale setBackgroundColor setBlendMode setCanvas setColor setColorMask setDefaultFilter setFont setLineJoin setLineStyle setLineWidth setNewFont setPointSize setScissor setShader setWireframe shear stencil transformPoint translate validateShader
 - **image**: newImageData
 - **joystick**: getJoystickCount getJoysticks loadGamepadMappings
 - **keyboard**: hasKeyRepeat hasTextInput isDown isModifierActive isScancodeDown setKeyRepeat setTextInput

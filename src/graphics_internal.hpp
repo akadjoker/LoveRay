@@ -22,6 +22,7 @@ constexpr const char *CANVAS_TYPE = "Canvas";
 constexpr const char *FONT_TYPE = "Font";
 constexpr const char *SPRITEBATCH_TYPE = "SpriteBatch";
 constexpr const char *TEXT_TYPE = "Text";
+constexpr const char *SHADER_TYPE = "Shader";
 
 // Filter / wrap names shared with love.image.
 int textureFilterFromNames(const std::string &min, const std::string &mag);
@@ -149,6 +150,20 @@ void applyFontFilter(FontObj &font);
 // alignment, under the transform built from the remaining arguments.
 void printText(lua_State *L, FontObj &font, int textIndex, float x, float y, float limit, const char *align,
                const Matrix &transform);
+
+// Shaders ----------------------------------------------------------------------
+
+struct ShaderObj;
+
+ShaderObj *checkShader(lua_State *L, int idx);
+// Makes `shader` the active raylib shader and primes its built-in uniforms.
+void shaderActivate(ShaderObj *shader, int targetWidth, int targetHeight);
+void shaderDeactivate();
+// Cheap per-draw refresh: re-registers extra textures, which raylib forgets after every batch flush.
+void shaderBeforeDraw(ShaderObj *shader);
+void shaderSetTargetSize(ShaderObj *shader, int width, int height);
+void registerShaderType(lua_State *L);
+extern const luaL_Reg SHADER_FUNCS[];
 
 // Registration ---------------------------------------------------------------
 
