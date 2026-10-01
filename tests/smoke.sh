@@ -33,6 +33,10 @@ run "particle tests" "$ROOT/tests/particles" --frames 10
 run "stencil tests" "$ROOT/tests/stencil"
 run "mesh tests" "$ROOT/tests/mesh" --frames 10
 
+for game in pong snake asteroids shmup platformer candy timer tutorials; do
+    run "demo stress $game" "$ROOT/tests/demos" "$game" 1500
+done
+
 if command -v python3 >/dev/null; then
     python3 "$ROOT/tests/make_archives.py" "$OUT"
     run "archive tests (directory)" "$ROOT/tests/archive" "$OUT/data.zip" dir
