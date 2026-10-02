@@ -4,13 +4,15 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LoveRay</title>
+    <link rel="icon" href="data:,">
     <style>
         html, body { margin: 0; height: 100%; background: #14161f; color: #dde; font: 14px/1.4 system-ui, sans-serif; }
         body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
         canvas { background: #000; border: 1px solid #333; max-width: 100vw; max-height: 100vh; }
         canvas:focus { outline: none; }
         #status { color: #9ab; min-height: 1.4em; }
-        #games a { color: #f9c24a; margin: 0 6px; }
+        #games { display: flex; flex-wrap: wrap; justify-content: center; max-width: 90vw; }
+        #games a { color: #f9c24a; margin: 2px 8px; }
     </style>
 </head>
 <body>

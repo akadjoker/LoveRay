@@ -107,6 +107,8 @@ Errors show the usual blue screen with a traceback. Press `R` to restart or `Esc
 
 ## Web build
 
+Every push to `main` publishes the examples at https://akadjoker.github.io/LoveRay/ through GitHub Pages. Pick one from the links under the canvas or with `?game=<name>`.
+
 With the Emscripten SDK active:
 
 ```sh

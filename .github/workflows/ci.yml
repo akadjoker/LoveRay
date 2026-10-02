@@ -106,6 +106,25 @@ jobs:
         with:
           name: loveray-web
           path: loveray-web.tar.gz
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/loveray-web
+
+  pages:
+    name: Pages
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: web
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
 
   release:
     name: Release
