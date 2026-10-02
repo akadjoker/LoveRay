@@ -4,6 +4,8 @@ A [Love2D](https://love2d.org) 11.5 compatible runtime built on [raylib](https:/
 
 Write a game with the Love2D API, run it with `love <game directory>` on Linux, Windows or in the browser.
 
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/akadjoker)
+
 ![physics](docs/media/001.gif)
 
 ## Status
@@ -141,3 +143,5 @@ Runs the API and physics conformance games plus every example headless under Xvf
 The original LoveRay was a quick experiment mixing raylib and Lua with its own bindings. The previous implementation is kept under `legacy/` for reference.
 
 Built on raylib, Lua, Box2D and the DejaVu Sans font.
+
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/akadjoker)
